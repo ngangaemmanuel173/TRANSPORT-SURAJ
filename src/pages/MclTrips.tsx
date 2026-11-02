@@ -6,7 +6,7 @@ import { Modal } from '@/components/Modal';
 import { LoadingSpinner } from '@/components/Shared';
 import { useToast } from '@/components/Toast';
 import {
-  TRIP_NUMS, SOURCE_CODES, McRate, FuelOverride, dayTotals, daysOfMonth, monthStart, currentMonth,
+  TRIP_NUMS, SOURCE_CODES, McRate, FuelOverride, rateFor, dayTotals, daysOfMonth, monthStart, currentMonth,
   shortDay, parseSources, freeNotes, buildNotes, fmt,
 } from '@/lib/mclGrid';
 
@@ -17,11 +17,13 @@ type Row = {
   weights: Record<number, string>; // KG, kept as strings while typing
   sources: Record<number, string>;
   notes: string;
+  from: string;                    // departure point (blank = derived from the sources used)
+  to: string;                      // destination (blank = derived)
   dup: number;                     // how many records already exist for this truck+date
   dirty: boolean;
 };
 
-const emptyRow = (): Row => ({ driver_id: '', weights: {}, sources: {}, notes: '', dup: 0, dirty: false });
+const emptyRow = (): Row => ({ driver_id: '', weights: {}, sources: {}, notes: '', from: '', to: '', dup: 0, dirty: false });
 
 const num = (s: string | undefined) => Number(s) || 0;
 
@@ -86,6 +88,8 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
         weights,
         sources: parseSources(t.notes),
         notes: freeNotes(t.notes),
+        from: t.departure_point || '',
+        to: t.destination || '',
         dup: 1,
         dirty: false,
       };
@@ -135,6 +139,8 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
         status: 'completed',
         net_tallage: Number(t.tons.toFixed(3)),
         notes: buildNotes(d.weights, r.sources, r.notes),
+        departure_point: fromOf(r, date) || null,
+        destination: toOf(r, date) || null,
       };
       TRIP_NUMS.forEach(n => { payload[`trip_${n}`] = d.weights[n] || 0; });
 
@@ -163,6 +169,20 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
   }, [rows, rates, days, override]);
 
   const truck = vehicles.find(v => v.id === vehicleId)?.plate_number;
+
+  // From / To default to what the material sources used that day imply (e.g. M -> MCL MINES to CRUSHER).
+  // Typing in the box overrides it.
+  const derive = (r: Row, date: string, field: 'name' | 'destination') => {
+    const out: string[] = [];
+    for (const n of TRIP_NUMS) {
+      if (!num(r.weights[n])) continue;
+      const v = rateFor(rates, r.sources[n] || 'M', date)?.[field];
+      if (v && !out.includes(v)) out.push(v);
+    }
+    return out.join(' / ');
+  };
+  const fromOf = (r: Row, date: string) => r.from || derive(r, date, 'name');
+  const toOf = (r: Row, date: string) => r.to || derive(r, date, 'destination');
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -227,6 +247,8 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
                 <tr>
                   <th className="sticky left-0 bg-white z-10">Date</th>
                   <th>Driver</th>
+                  <th>From</th>
+                  <th>To (destination)</th>
                   {TRIP_NUMS.map(n => <th key={n} className="text-center">Trip {n}<div className="font-normal text-[9px] text-slate-400">KG · source</div></th>)}
                   <th className="text-right">Trips</th>
                   <th className="text-right">Tons</th>
@@ -250,6 +272,14 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
                           {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                         </select>
                       </td>
+                      <td>
+                        <input className="w-32 border border-slate-300 rounded px-1 py-1 text-[11px]" placeholder="From"
+                          value={fromOf(r, date)} onChange={e => patch(date, x => ({ ...x, from: e.target.value }))} />
+                      </td>
+                      <td>
+                        <input className="w-28 border border-slate-300 rounded px-1 py-1 text-[11px]" placeholder="To"
+                          value={toOf(r, date)} onChange={e => patch(date, x => ({ ...x, to: e.target.value }))} />
+                      </td>
                       {TRIP_NUMS.map(n => (
                         <td key={n} className="px-1">
                           <input
@@ -264,7 +294,10 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
                             value={r.sources[n] || 'M'}
                             onChange={e => setSource(date, n, e.target.value)}
                           >
-                            {SOURCE_CODES.map(c => <option key={c} value={c}>{c}</option>)}
+                            {SOURCE_CODES.map(c => {
+                              const rt = rateFor(rates, c, date);
+                              return <option key={c} value={c} title={rt ? `${rt.name} → ${rt.destination}` : c}>{c}</option>;
+                            })}
                           </select>
                         </td>
                       ))}
@@ -279,7 +312,7 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
               <tfoot>
                 <tr className="font-bold bg-slate-50">
                   <td className="sticky left-0 bg-slate-50">{truck} total</td>
-                  <td colSpan={TRIP_NUMS.length + 1} />
+                  <td colSpan={TRIP_NUMS.length + 3} />
                   <td className="text-right text-blue-700">{summary.trips}</td>
                   <td className="text-right text-emerald-700">{fmt(summary.tons, 2)}</td>
                   <td className="text-right">{fmt(summary.revenue)}</td>
