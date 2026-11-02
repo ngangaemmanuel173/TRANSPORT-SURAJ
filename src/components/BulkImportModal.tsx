@@ -118,9 +118,11 @@ export function BulkImportModal({
 
       for (let i = 1; i < lines.length; i++) {
         const values = lines[i].split(delimiter).map(v => v.trim().replace(/^["']|["']$/g, ''));
-        const record: Record<string, any> = {
-          sub_account: subAccount,
-        };
+        // The per-sub-account trips tables (mcl_trips, csl_trips, ...) keep the data apart by being separate
+        // tables and have no sub_account column, so it must not be sent for them.
+        const OWN_TRIPS = ['mcl_trips', 'csl_trips', 'tarmal_trips', 'pn_mashru_trips', 'mushroom_trips'];
+        const record: Record<string, any> = OWN_TRIPS.includes(tableName) ? {} : { sub_account: subAccount };
+        const baseKeys = Object.keys(record).length;
 
         headers.forEach((header, index) => {
           if (!header) return;
@@ -144,7 +146,7 @@ export function BulkImportModal({
         });
 
         // Skip row if no actual values were assigned beyond sub_account
-        if (Object.keys(record).length <= 1) continue;
+        if (Object.keys(record).length <= baseKeys) continue;
 
         const { error } = await supabase.from(tableName).insert([record]);
         if (error) {
