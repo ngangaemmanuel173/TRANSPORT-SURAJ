@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Route as RouteIcon, Save, Settings2, Trash2, Plus } from 'lucide-react';
+import { Route as RouteIcon, Save, Settings2, Trash2, Plus, Download, Upload } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { PageHeader } from '@/components/PageHeader';
 import { Modal } from '@/components/Modal';
 import { LoadingSpinner } from '@/components/Shared';
+import { MclImportModal, downloadMclTemplate } from '@/components/MclImportModal';
+import { syncFuelMirror } from '@/lib/mclFuelSync';
 import { useToast } from '@/components/Toast';
 import {
   TRIP_NUMS, SOURCE_CODES, McRate, FuelOverride, rateFor, dayTotals, daysOfMonth, monthStart, currentMonth,
@@ -45,6 +47,7 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
   const [month, setMonth] = useState(currentMonth());
   const [rows, setRows] = useState<Record<string, Row>>({});
   const [ratesOpen, setRatesOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const days = useMemo(() => daysOfMonth(month), [month]);
   const dirtyCount = useMemo(() => Object.values(rows).filter(r => r.dirty).length, [rows]);
@@ -149,6 +152,8 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
         : await supabase.from('mcl_trips').insert([payload]);
       if (error) { failed++; showToast(`${date}: ${error.message}`, 'error'); }
     }
+    // keep the fuel cost records (planned litres per day) in step with these trips
+    try { await syncFuelMirror(vehicleId, month); } catch { /* fuel tables not set up yet: ignore */ }
     setSaving(false);
     if (failed === 0) showToast('Trips saved', 'success');
     loadMonth();
@@ -209,6 +214,12 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
           <input type="month" className="input" value={month} onChange={e => e.target.value && guard(() => setMonth(e.target.value))} />
         </div>
         <div className="flex-1" />
+        <button onClick={() => downloadMclTemplate('trips', { vehicles, drivers, rates })} className="btn-secondary flex items-center gap-2">
+          <Download className="h-4 w-4" /> Download Template
+        </button>
+        <button onClick={() => setImportOpen(true)} className="btn-secondary flex items-center gap-2">
+          <Upload className="h-4 w-4" /> Bulk Import
+        </button>
         <button onClick={() => setRatesOpen(true)} className="btn-secondary flex items-center gap-2">
           <Settings2 className="h-4 w-4" /> Rates &amp; fuel allocation
         </button>
@@ -328,6 +339,7 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
         </>
       )}
 
+      <MclImportModal open={importOpen} onClose={() => setImportOpen(false)} kind="trips" lookup={{ vehicles, drivers, rates }} onDone={loadMonth} />
       <RatesModal open={ratesOpen} onClose={() => setRatesOpen(false)} rates={rates} onChanged={loadLookups} />
     </div>
   );
