@@ -24,8 +24,9 @@ const HEADERS: Record<TemplateName, string[]> = {
     'Date', 'Truck Plate', 'Trailer No', 'Driver', 'Net Tallage', 'Linked Trip Date', 'Area (MCL only)', 'Notes',
   ],
   spare_parts: [
-    'Serial Number', 'Part Name', 'Category (battery/general/miscellaneous)', 'Part Type (new/rebound)', 'Status',
-    'Sub-Account', 'Supplier', 'Purchase Date', 'Unit Cost (KES)', 'Current Truck', 'Installed Date', 'Last Changed Date', 'Notes',
+    'Serial Number', 'Part Name', 'Category (battery/general/miscellaneous)', 'Part Type (new/rebound)',
+    'Status (in_store/in_use/under_repair/retired)', 'Supplier', 'Purchase Date', 'Unit Cost (KES)',
+    'Current Truck', 'Installed Date', 'Last Changed Date', 'Notes',
   ],
   spare_part_history: [
     'Serial Number', 'Action', 'Date', 'Truck Plate', 'Duration (days)', 'Reason', 'Performed By', 'Notes',
