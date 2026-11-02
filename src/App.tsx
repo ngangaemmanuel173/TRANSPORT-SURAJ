@@ -209,8 +209,8 @@ function AppContent() {
     switch (currentTab) {
       case 'live-monitor': return <LiveMonitor color={portal.color} subAccountFilter={portal.slug} />;
       case 'dashboard': return <Dashboard onViewAllContainers={() => setActiveTab('containers')} onViewCompliance={() => setActiveTab('compliance')} />;
-      case 'trips': return <SubAccountTrips mclArea={null} portalColor={portal.color} />;
-      case 'fuel': return <SubAccountFuel mclArea={null} portalColor={portal.color} />;
+      case 'trips': return portal.slug === 'mcl' ? <MclTrips portalColor={portal.color} /> : <SubAccountTrips mclArea={null} portalColor={portal.color} />;
+      case 'fuel': return portal.slug === 'mcl' ? <MclFuel portalColor={portal.color} /> : <SubAccountFuel mclArea={null} portalColor={portal.color} />;
       case 'allowances': return <DriverAllowancesPage portalColor={portal.color} subAccount={portal.slug} />;
       case 'cost-reports': return <CostReportsPage portalColor={portal.color} lockedSubAccount={portal.slug} />;
       case 'tallies': return <SubAccountTallies mclArea={null} portalColor={portal.color} />;
