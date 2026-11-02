@@ -3,15 +3,19 @@ import * as XLSX from 'xlsx';
 export const TEMPLATE_SCHEMAS: Record<string, { filename: string; headers: string[]; example: Record<string, any> }> = {
   spare_parts: {
     filename: 'Spare_Parts_Import_Template.xlsx',
-    headers: ['serial_number', 'part_name', 'category', 'part_type', 'status', 'supplier', 'unit_cost', 'notes'],
+    headers: ['serial_number', 'part_name', 'category', 'part_type', 'status', 'supplier', 'purchase_date', 'unit_cost', 'current_truck', 'installed_date', 'last_changed_date', 'notes'],
     example: {
       serial_number: 'BAT-00102',
       part_name: 'Heavy Duty Battery 12V',
-      category: 'batteries_critical', // batteries_critical or general
+      category: 'battery', // battery, general or miscellaneous
       part_type: 'new', // new or rebound
-      status: 'in_store', // in_store, in_use, under_repair, retired
+      status: 'in_use', // in_store, in_use, under_repair, retired
       supplier: 'Mombasa Auto Spares',
+      purchase_date: '2026-10-01',
       unit_cost: 18500,
+      current_truck: 'KDG 123A', // truck plate number
+      installed_date: '2026-10-05',
+      last_changed_date: '2026-10-05',
       notes: 'Initial stock intake'
     }
   },
