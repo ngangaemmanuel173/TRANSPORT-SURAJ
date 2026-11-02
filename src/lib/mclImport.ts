@@ -19,8 +19,9 @@ export type TripImportRow = {
   driver_id: string | null;
   weights: Record<number, number>;
   sources: Record<number, string>;
-  from: string;
-  to: string;
+  from: string;                                      // day-level From (fallback for trips with no own From)
+  to: string;                                        // day-level To
+  legs: Record<number, { from: string; to: string }>; // per-trip From/To typed in the file (blank = default from the source)
 };
 
 export type FuelImportRow = {
@@ -148,27 +149,41 @@ export function validateTrips(raw: Record<string, any>[], lk: Lookup): ImportRes
       driver_id = d.id;
     }
 
+    const dayFrom = String(pick(n, 'from', 'departure_point', 'origin') ?? '');
+    const dayTo = String(pick(n, 'to', 'destination', 'to_destination') ?? '');
+
+    // per-trip From/To: trip_N_from / trip_N_to, falling back to the day's from / to
+    const legs: Record<number, { from: string; to: string }> = {};
+    for (const k of TRIP_NUMS) {
+      if (!weights[k]) continue;
+      const f = String(pick(n, `trip_${k}_from`, `from_${k}`, `trip${k}_from`) ?? dayFrom);
+      const t = String(pick(n, `trip_${k}_to`, `to_${k}`, `trip${k}_to`) ?? dayTo);
+      if (f || t) legs[k] = { from: f, to: t };
+    }
+
     seen.set(dupKey, line);
     rows.push({
       line, date, vehicle_id: vehicle.id, plate: vehicle.plate_number, driver_id, weights, sources,
-      from: String(pick(n, 'from', 'departure_point', 'origin') ?? ''),
-      to: String(pick(n, 'to', 'destination', 'to_destination') ?? ''),
+      from: dayFrom, to: dayTo, legs,
     });
   });
 
   return { rows, errors, skipped };
 }
 
-// From / To default to what the sources used imply, the same as on the Trips sheet.
+// Each trip's From/To = what the file says for that trip, otherwise the route of its material source
+// (the same as on the Trips sheet). Returns the day summary (all different places joined with " / ").
 export function deriveFromTo(row: TripImportRow, rates: McRate[]) {
   const from: string[] = [], to: string[] = [];
   for (const k of TRIP_NUMS) {
     if (!row.weights[k]) continue;
     const r = rateFor(rates, row.sources[k], row.date);
-    if (r?.name && !from.includes(r.name)) from.push(r.name);
-    if (r?.destination && !to.includes(r.destination)) to.push(r.destination);
+    const f = row.legs[k]?.from || r?.name || '';
+    const t = row.legs[k]?.to || r?.destination || '';
+    if (f && !from.includes(f)) from.push(f);
+    if (t && !to.includes(t)) to.push(t);
   }
-  return { from: row.from || from.join(' / '), to: row.to || to.join(' / ') };
+  return { from: from.join(' / '), to: to.join(' / ') };
 }
 
 // ---------------------------------------------------------------- fuel
@@ -218,21 +233,21 @@ export function validateFuel(raw: Record<string, any>[], lk: Lookup): ImportResu
 // ---------------------------------------------------------------- templates (rows written by the modal)
 export const TRIP_TEMPLATE_HEADERS = [
   'date', 'truck', 'driver', 'from', 'to',
-  ...TRIP_NUMS.flatMap(n => [`trip_${n}_kg`, `trip_${n}_src`]),
+  ...TRIP_NUMS.flatMap(n => [`trip_${n}_kg`, `trip_${n}_src`, `trip_${n}_from`, `trip_${n}_to`]),
 ];
 
 export const FUEL_TEMPLATE_HEADERS = ['date', 'truck', 'fuel_1', 'fuel_2', 'fuel_3', 'actual_balance', 'opening_balance'];
 
 export function tripTemplateExamples(plate: string, driver: string): (string | number)[][] {
   const blank = (len: number) => Array(len).fill('');
-  const mk = (date: string, trips: [number, string][]) => {
+  const mk = (date: string, trips: [number, string, string?, string?][]) => {
     const row: (string | number)[] = [date, plate, driver, '', ''];
-    TRIP_NUMS.forEach((_, i) => { row.push(trips[i]?.[0] ?? '', trips[i]?.[1] ?? ''); });
+    TRIP_NUMS.forEach((_, i) => { row.push(trips[i]?.[0] ?? '', trips[i]?.[1] ?? '', trips[i]?.[2] ?? '', trips[i]?.[3] ?? ''); });
     return row.length === TRIP_TEMPLATE_HEADERS.length ? row : [...row, ...blank(TRIP_TEMPLATE_HEADERS.length - row.length)];
   };
   return [
     mk('2026-11-01', [[31220, 'M'], [30980, 'M'], [31450, 'G']]),
-    mk('2026-11-02', [[29800, 'N'], [30100, 'T']]),
+    mk('2026-11-02', [[29800, 'N'], [30100, 'T', 'Vipingo', 'Mombasa']]),
   ];
 }
 
