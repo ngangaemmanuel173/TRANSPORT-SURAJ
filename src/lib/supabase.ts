@@ -33,6 +33,17 @@ export function getSubAccountFilter(): string | null {
   return currentSubAccount;
 }
 
+/**
+ * The sub-account a page should save to and read from.
+ * A Corporate Admin has profile.sub_account = 'master' even while looking at /csl, /mcl, ...;
+ * the proxy filter is pinned to the portal in that case, so it wins. For operations users both are the same.
+ */
+export function activeSubAccount(profileSub: string | null | undefined, fallback = 'master'): string {
+  const f = currentSubAccount;
+  if (f && f !== 'master') return f;
+  return profileSub ?? f ?? fallback;
+}
+
 const EXCLUDED_TABLES = new Set(['profiles', 'spare_part_history']);
 
 // Trips tables that are already separate per sub-account. The table itself keeps the
