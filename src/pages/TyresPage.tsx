@@ -19,7 +19,7 @@ const SUB_ACCOUNTS = [
   { value: 'mcl', label: 'MCL' },
   { value: 'tarmal', label: 'Tarmal' },
   { value: 'csl', label: 'CSL' },
-  { value: 'pn_mashru', label: 'pn_mashru' },
+  { value: 'pn_mashru', label: 'PN Mashru' },
 ];
 
 const STATUSES = [
@@ -64,6 +64,7 @@ const viewOf = (t: any): ViewKey => {
 };
 
 const EMPTY_FORM = {
+  sub_account: '',
   serial_number: '',
   brand: '',
   size: '',
@@ -332,6 +333,22 @@ function TyresSubAccountView({ mclArea, portalColor, forceSubAccount }: { mclAre
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
 
+  // Sub-account chosen inside the Add tyre form, and the trucks that belong to it
+  const [formVehicles, setFormVehicles] = useState<any[]>([]);
+
+  const chooseFormSubAccount = async (sa: string) => {
+    setForm(f => ({ ...f, sub_account: sa, current_truck_id: '' }));
+    setFormVehicles([]);
+    if (!sa) return;
+    setSubAccountFilter(sa); // so the trucks query is not blocked by another sub-account's filter
+    const { data } = await supabase
+      .from('vehicles')
+      .select('id, plate_number')
+      .eq('sub_account', sa)
+      .order('plate_number');
+    setFormVehicles(data || []);
+  };
+
   const [history, setHistory] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [actionOpen, setActionOpen] = useState(false);
@@ -438,7 +455,9 @@ function TyresSubAccountView({ mclArea, portalColor, forceSubAccount }: { mclAre
 
   const openAdd = () => {
     setEditingId(null);
-    setForm({ ...EMPTY_FORM, tyre_type: view === 'rebound' ? 'rebound' : 'new' });
+    const preset = ['mcl', 'tarmal', 'csl', 'pn_mashru'].includes(subAccount) ? subAccount : '';
+    setForm({ ...EMPTY_FORM, sub_account: preset, tyre_type: view === 'rebound' ? 'rebound' : 'new' });
+    setFormVehicles(preset ? vehicles : []);
     setFormOpen(true);
   };
 
@@ -463,12 +482,14 @@ function TyresSubAccountView({ mclArea, portalColor, forceSubAccount }: { mclAre
   const saveTyre = async () => {
     const serial = form.serial_number.trim();
     if (!serial) { toast('Serial number is required', 'error'); return; }
+    const saveSub = editingId ? subAccount : form.sub_account;
+    if (!saveSub) { toast('Choose which sub-account this tyre is for', 'error'); return; }
     const addingFitted = !editingId && form.store_as === 'fitted';
     if (addingFitted && !form.current_truck_id) { toast('Choose the truck this tyre is fitted on', 'error'); return; }
 
     setSaving(true);
     try {
-      let dupQuery = supabase.from('tyres_v2').select('id').eq('sub_account', subAccount).ilike('serial_number', serial);
+      let dupQuery = supabase.from('tyres_v2').select('id').eq('sub_account', saveSub).ilike('serial_number', serial);
       if (editingId) dupQuery = (dupQuery as any).neq('id', editingId);
       const { data: dupes } = await dupQuery;
       if (dupes && dupes.length > 0) {
@@ -497,18 +518,18 @@ function TyresSubAccountView({ mclArea, portalColor, forceSubAccount }: { mclAre
         const fittedDate = form.fitted_date || todayStr();
         const insertRow = addingFitted
           ? {
-              ...base, sub_account: subAccount, status: 'fitted',
+              ...base, sub_account: saveSub, status: 'fitted',
               current_truck_id: form.current_truck_id, position: form.position.trim() || null,
               fitted_date: fittedDate, last_action: 'fitted', last_action_date: fittedDate,
             }
-          : { ...base, sub_account: subAccount, status: 'in_store' };
+          : { ...base, sub_account: saveSub, status: 'in_store' };
 
         const { data, error } = await supabase.from('tyres_v2').insert(insertRow).select('id').single();
         if (error) throw error;
 
         if (addingFitted && data?.id) {
           await supabase.from('tyre_history').insert({
-            tyre_id: data.id, sub_account: subAccount, action: 'fitted', action_date: fittedDate,
+            tyre_id: data.id, sub_account: saveSub, action: 'fitted', action_date: fittedDate,
             truck_id: form.current_truck_id, position: form.position.trim() || null,
             performed_by: performedBy, reason: 'Opening record',
           });
@@ -869,6 +890,19 @@ function TyresSubAccountView({ mclArea, portalColor, forceSubAccount }: { mclAre
               <button onClick={() => setFormOpen(false)} className="text-slate-400 hover:text-slate-700"><X className="h-5 w-5" /></button>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {!editingId && (
+                <div className="sm:col-span-2">
+                  <label className={labelCls}>Sub-account *</label>
+                  <select
+                    value={form.sub_account}
+                    onChange={e => chooseFormSubAccount(e.target.value)}
+                    className={inputCls}
+                  >
+                    <option value="">Select sub-account</option>
+                    {SUB_ACCOUNTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className={labelCls}>Serial number *</label>
                 <input value={form.serial_number} onChange={e => setForm({ ...form, serial_number: e.target.value })} className={inputCls} />
@@ -923,7 +957,7 @@ function TyresSubAccountView({ mclArea, portalColor, forceSubAccount }: { mclAre
                     <label className={labelCls}>Truck *</label>
                     <select value={form.current_truck_id} onChange={e => setForm({ ...form, current_truck_id: e.target.value })} className={inputCls}>
                       <option value="">Select truck</option>
-                      {vehicles.map(v => <option key={v.id} value={v.id}>{v.plate_number}</option>)}
+                      {formVehicles.map(v => <option key={v.id} value={v.id}>{v.plate_number}</option>)}
                     </select>
                   </div>
                   <div>
