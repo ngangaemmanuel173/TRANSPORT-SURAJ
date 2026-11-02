@@ -3,7 +3,7 @@ import {
   Fuel as FuelIcon, Plus, Edit, Filter, ChevronDown, ChevronUp,
   TrendingUp, AlertTriangle, DollarSign, Truck as TruckIcon, Upload,
 } from 'lucide-react';
-import { supabase, getSubAccountFilter } from '@/lib/supabase';
+import { supabase, getSubAccountFilter, activeSubAccount } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { PageHeader } from '@/components/PageHeader';
 import { Modal } from '@/components/Modal';
@@ -89,7 +89,7 @@ function MiniBarChart({ data, color }: { data: { label: string; expected: number
 export function SubAccountFuel({ mclArea, portalColor }: { mclArea: MCLArea | null; portalColor: string }) {
   const { showToast } = useToast();
   const { profile } = useAuth();
-  const subAccount = (profile?.sub_account ?? getSubAccountFilter() ?? 'master') as SubAccount;
+  const subAccount = activeSubAccount(profile?.sub_account, 'master') as SubAccount;
   const isMCL = subAccount === 'mcl';
 
   const [loading, setLoading] = useState(true);
