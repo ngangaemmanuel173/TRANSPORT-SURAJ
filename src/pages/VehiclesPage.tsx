@@ -1,7 +1,7 @@
 import { useTruckDriverFilter, TruckDriverBar } from '@/components/TruckDriverFilter';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Truck as TruckIcon, Plus, Search, Edit, Trash2, CheckCircle, XCircle, Upload, Filter } from 'lucide-react';
-import { supabase, getSubAccountFilter } from '@/lib/supabase';
+import { supabase, getSubAccountFilter, activeSubAccount } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { SubAccount } from '@/lib/portals';
 import { useToast } from '@/components/Toast';
@@ -25,7 +25,7 @@ const SUB_ACCOUNTS: SubAccount[] = ['mcl', 'tarmal', 'csl', 'pn_mashru'];
 export function VehiclesPage({ portalColor = '#0f172a', isMaster = false }: { portalColor?: string; isMaster?: boolean }) {
   const { profile } = useAuth();
   const { showToast } = useToast();
-  const subAccount = (profile?.sub_account ?? getSubAccountFilter() ?? 'mcl') as SubAccount;
+  const subAccount = activeSubAccount(profile?.sub_account, 'mcl') as SubAccount;
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
