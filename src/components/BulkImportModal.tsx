@@ -11,6 +11,10 @@ interface BulkImportModalProps {
   portalColor: string;
   subAccount: SubAccount;
   sampleColumns: string[];
+  /** Optional example row for the template (same order as sampleColumns) */
+  sampleRow?: string[];
+  /** Optional per-row clean-up before insert. Return null to skip the row. */
+  transformRecord?: (record: Record<string, any>) => Record<string, any> | null;
   onSuccess: () => void;
 }
 
@@ -21,6 +25,8 @@ export function BulkImportModal({
   portalColor,
   subAccount,
   sampleColumns,
+  sampleRow,
+  transformRecord,
   onSuccess,
 }: BulkImportModalProps) {
   const { showToast } = useToast();
@@ -36,8 +42,8 @@ export function BulkImportModal({
   // 1. Download CSV Template
   const downloadTemplate = () => {
     const headerRow = sampleColumns.join(',');
-    const sampleRow = sampleColumns.map(() => 'sample_value').join(',');
-    const csvContent = `data:text/csv;charset=utf-8,${headerRow}\n${sampleRow}`;
+    const sampleRowCsv = (sampleRow ?? sampleColumns.map(() => 'sample_value')).join(',');
+    const csvContent = `data:text/csv;charset=utf-8,${headerRow}\n${sampleRowCsv}`;
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
@@ -68,8 +74,10 @@ export function BulkImportModal({
   const TEXT_COLUMNS = new Set([
     'trip_date', 'fuel_date', 'sub_account', 'mcl_area_id', 'departure_point',
     'arrival_point', 'destination_city', 'trailer_number', 'status', 'notes',
-    'vehicle_id', 'driver_id',
+    'vehicle_id', 'driver_id', 'current_truck', 'serial_number', 'part_name', 'part_type', 'category', 'supplier',
   ]);
+  // Numeric columns where an empty cell should stay empty (NULL) instead of becoming 0
+  const NULLABLE_NUMERIC = new Set(['unit_cost']);
 
   // Helper to check if a column is typically numeric
   const isNumericHeader = (header: string): boolean => {
@@ -131,7 +139,7 @@ export function BulkImportModal({
           if (isNumericHeader(header)) {
             // Convert numbers safely, default to 0 for invalid/empty entries or letter artifacts
             if (rawVal === undefined || rawVal === '' || isNaN(Number(rawVal))) {
-              record[header] = 0;
+              record[header] = NULLABLE_NUMERIC.has(header.trim().toLowerCase()) ? null : 0;
             } else {
               record[header] = Number(rawVal);
             }
@@ -148,7 +156,10 @@ export function BulkImportModal({
         // Skip row if no actual values were assigned beyond sub_account
         if (Object.keys(record).length <= baseKeys) continue;
 
-        const { error } = await supabase.from(tableName).insert([record]);
+        const finalRecord = transformRecord ? transformRecord(record) : record;
+        if (!finalRecord) { errorCount++; continue; }
+
+        const { error } = await supabase.from(tableName).insert([finalRecord]);
         if (error) {
           console.error('Row insert error:', error.message);
           errorCount++;
