@@ -17,7 +17,34 @@ import { BulkImportModal } from '@/components/BulkImportModal';
 
 const DOCUMENT_BUCKET = 'spare-part-documents'; // Supabase Storage bucket for uploads
 
-const SAMPLE_COLUMNS = ['serial_number', 'part_name', 'category', 'part_type', 'status', 'supplier', 'unit_cost', 'notes'];
+// Same fields, same order as the "Add spare part" form
+const SAMPLE_COLUMNS = [
+  'serial_number', 'part_name', 'category', 'part_type', 'status', 'supplier',
+  'purchase_date', 'unit_cost', 'current_truck', 'installed_date', 'last_changed_date', 'notes',
+];
+const SAMPLE_ROW = [
+  'BAT-0001', 'Truck Battery 200Ah', 'battery', 'new', 'in_use', 'Supplier Ltd',
+  '2026-10-01', '25000', 'KDG 123A', '2026-10-05', '2026-10-05', '',
+];
+
+// Accepts the dropdown labels as well as the stored values, e.g. "Battery / Critical" or "In Use"
+const norm = (v: any) => String(v ?? '').trim().toLowerCase().replace(/[\s/_-]+/g, ' ');
+const CATEGORY_ALIASES: Record<string, string> = {
+  'battery': 'battery', 'battery critical': 'battery', 'batteries critical': 'battery', 'batteries': 'battery', 'critical': 'battery',
+  'general': 'general', 'miscellaneous': 'miscellaneous', 'misc': 'miscellaneous',
+};
+const STATUS_ALIASES: Record<string, string> = {
+  'in store': 'in_store', 'in use': 'in_use', 'under repair': 'under_repair', 'retired': 'retired',
+};
+// Accepts 2026-10-05 or 05/10/2026 (day/month/year) and returns YYYY-MM-DD
+const toIsoDate = (v: any): string | null => {
+  const t = String(v ?? '').trim();
+  if (!t) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  const m = t.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  return null;
+};
 
 const SUB_ACCOUNTS = [
   { value: 'mcl', label: 'MCL' },
@@ -462,7 +489,7 @@ function SparePartsSubAccountView({ mclArea, portalColor, forceSubAccount }: { m
 
   const downloadTemplate = () => {
     const header = SAMPLE_COLUMNS.join(',');
-    const example = ['BAT-0001', 'Truck Battery 200Ah', 'battery', 'new', 'in_store', 'Supplier Ltd', '25000', ''].join(',');
+    const example = SAMPLE_ROW.join(',');
     const blob = new Blob([`${header}\n${example}\n`], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1040,6 +1067,31 @@ function SparePartsSubAccountView({ mclArea, portalColor, forceSubAccount }: { m
           portalColor={portalColor}
           subAccount={subAccount}
           sampleColumns={SAMPLE_COLUMNS}
+          sampleRow={SAMPLE_ROW}
+          transformRecord={(rec) => {
+            const serial = String(rec.serial_number ?? '').trim();
+            const name = String(rec.part_name ?? '').trim();
+            if (!serial || !name) return null; // both are required, same as the form
+
+            // current_truck is a plate number in the file; the table stores current_truck_id
+            const plate = String(rec.current_truck ?? '').trim().toLowerCase().replace(/\s+/g, '');
+            const truck = plate ? vehicles.find(v => String(v.plate_number || '').toLowerCase().replace(/\s+/g, '') === plate) : null;
+            delete rec.current_truck;
+
+            const installed = toIsoDate(rec.installed_date);
+            return {
+              ...rec,
+              serial_number: serial,
+              part_name: name,
+              category: CATEGORY_ALIASES[norm(rec.category)] || 'general',
+              part_type: norm(rec.part_type) === 'rebound' ? 'rebound' : 'new',
+              status: STATUS_ALIASES[norm(rec.status)] || (norm(rec.status).replace(/ /g, '_') || 'in_store'),
+              purchase_date: toIsoDate(rec.purchase_date),
+              installed_date: installed,
+              last_changed_date: toIsoDate(rec.last_changed_date) || installed,
+              current_truck_id: truck ? truck.id : null,
+            };
+          }}
           onSuccess={loadData}
         />
     </div>
