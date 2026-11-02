@@ -24,7 +24,7 @@ export function downloadMclTemplate(kind: ImportKind, lk: Pick<Lookup, 'vehicles
   const headers = kind === 'trips' ? TRIP_TEMPLATE_HEADERS : FUEL_TEMPLATE_HEADERS;
   const examples = kind === 'trips' ? tripTemplateExamples(plate, driver) : fuelTemplateExamples(plate);
   const sheet = XLSX.utils.aoa_to_sheet([headers, ...examples]);
-  sheet['!cols'] = headers.map((h, i) => ({ wch: i < 5 ? 14 : 11 }));
+  sheet['!cols'] = headers.map((h, i) => ({ wch: i < 5 ? 14 : kind === 'trips' && (i - 5) % 4 >= 2 ? 16 : 11 }));
   XLSX.utils.book_append_sheet(wb, sheet, kind === 'trips' ? 'MCL Trips' : 'MCL Fuel');
 
   const help: (string | number)[][] =
@@ -35,9 +35,10 @@ export function downloadMclTemplate(kind: ImportKind, lk: Pick<Lookup, 'vehicles
           ['date', 'yyyy-mm-dd (for example 2026-11-01) or dd/mm/yyyy'],
           ['truck', 'Plate number exactly as in Trucks / Vehicles'],
           ['driver', 'Optional. Name exactly as in Drivers'],
-          ['from, to', 'Optional. Left blank, they are filled from the material source (for example M gives MCL MINES to CRUSHER)'],
+          ['from, to', 'Optional. Used for every trip of that day that has no from/to of its own. Left blank, they are filled from the material source (for example M gives MCL MINES to CRUSHER)'],
           ['trip_N_kg', 'Weight of trip N in KG (up to 13 trips). Leave blank when there is no trip'],
           ['trip_N_src', 'Material source of trip N. Blank means M'],
+          ['trip_N_from, trip_N_to', 'Optional. Where trip N loaded and where it delivered. Use this when trips of the same day go to different places. Blank = the day\'s from/to, or the material source route'],
           [],
           ['Material source', 'Material', 'To', 'Rate / ton', 'Fuel L / trip'],
           ...SOURCE_CODES.map(c => {
@@ -101,6 +102,7 @@ async function importTrips(rows: TripImportRow[], rates: McRate[]) {
       notes: buildNotes(r.weights, r.sources, hit ? freeNotes(hit.notes) : ''),
       departure_point: ft.from || null,
       destination: ft.to || null,
+      trip_legs: Object.fromEntries(Object.entries(r.legs).map(([k, v]) => [k, v])),
     };
     if (r.driver_id) payload.driver_id = r.driver_id;
     TRIP_NUMS.forEach(n => { payload[`trip_${n}`] = r.weights[n] || 0; });
@@ -215,7 +217,7 @@ export function MclImportModal({
           <p className="font-semibold text-slate-800 mb-1">1. Get the template</p>
           <p className="text-xs mb-2">
             {kind === 'trips'
-              ? 'One row per truck per day: date, truck, driver, from, to, then trip 1 to 13 each with KG and material source.'
+              ? 'One row per truck per day: date, truck, driver, from, to, then trip 1 to 13 each with KG, material source, and its own from and to (optional).'
               : 'One row per truck per day: date, truck, fuel 1, 2, 3, actual balance and (first day of the month only) opening balance.'}
           </p>
           <button onClick={() => downloadMclTemplate(kind, lookup)} className="btn-secondary flex items-center gap-2">
