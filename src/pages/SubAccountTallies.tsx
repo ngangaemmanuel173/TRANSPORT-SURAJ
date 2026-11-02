@@ -1,7 +1,7 @@
 import { useTruckDriverFilter, TruckDriverBar } from '@/components/TruckDriverFilter';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Calculator, Plus, Edit, Link2, Upload } from 'lucide-react';
-import { supabase, getSubAccountFilter } from '@/lib/supabase';
+import { supabase, getSubAccountFilter, activeSubAccount } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { PageHeader } from '@/components/PageHeader';
 import { Modal } from '@/components/Modal';
@@ -27,7 +27,7 @@ interface SubTally {
 export function SubAccountTallies({ mclArea, portalColor }: { mclArea: MCLArea | null; portalColor: string }) {
   const { showToast } = useToast();
   const { profile } = useAuth();
-  const subAccount = (profile?.sub_account ?? getSubAccountFilter() ?? 'master') as SubAccount;
+  const subAccount = activeSubAccount(profile?.sub_account, 'master') as SubAccount;
   const isMCL = subAccount === 'mcl';
 
   const [loading, setLoading] = useState(true);
