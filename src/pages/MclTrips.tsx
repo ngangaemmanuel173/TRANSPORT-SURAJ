@@ -19,13 +19,12 @@ type Row = {
   weights: Record<number, string>; // KG, kept as strings while typing
   sources: Record<number, string>;
   notes: string;
-  from: string;                    // departure point (blank = derived from the sources used)
-  to: string;                      // destination (blank = derived)
+  legs: Record<number, { from: string; to: string }>; // per-trip From/To (blank = default from the trip's material source)
   dup: number;                     // how many records already exist for this truck+date
   dirty: boolean;
 };
 
-const emptyRow = (): Row => ({ driver_id: '', weights: {}, sources: {}, notes: '', from: '', to: '', dup: 0, dirty: false });
+const emptyRow = (): Row => ({ driver_id: '', weights: {}, sources: {}, notes: '', legs: {}, dup: 0, dirty: false });
 
 const num = (s: string | undefined) => Number(s) || 0;
 
@@ -33,6 +32,16 @@ function rowToDay(r: Row) {
   const weights: Record<number, number> = {};
   TRIP_NUMS.forEach(n => { weights[n] = num(r.weights[n]); });
   return { weights, sources: r.sources };
+}
+
+function legsFromRow(raw: any): Row['legs'] {
+  const out: Row['legs'] = {};
+  if (raw && typeof raw === 'object') {
+    Object.entries(raw).forEach(([k, v]: [string, any]) => {
+      out[Number(k)] = { from: v?.from || '', to: v?.to || '' };
+    });
+  }
+  return out;
 }
 
 export function MclTrips({ portalColor }: { portalColor: string }) {
@@ -48,6 +57,9 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
   const [rows, setRows] = useState<Record<string, Row>>({});
   const [ratesOpen, setRatesOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [routeDay, setRouteDay] = useState<string | null>(null);
+  const [defFrom, setDefFrom] = useState('');
+  const [defTo, setDefTo] = useState('');
 
   const days = useMemo(() => daysOfMonth(month), [month]);
   const dirtyCount = useMemo(() => Object.values(rows).filter(r => r.dirty).length, [rows]);
@@ -91,8 +103,7 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
         weights,
         sources: parseSources(t.notes),
         notes: freeNotes(t.notes),
-        from: t.departure_point || '',
-        to: t.destination || '',
+        legs: legsFromRow(t.trip_legs),
         dup: 1,
         dirty: false,
       };
@@ -124,6 +135,33 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
   const setSource = (date: string, n: number, v: string) =>
     patch(date, r => ({ ...r, sources: { ...r.sources, [n]: v } }));
 
+  const setLeg = (date: string, n: number, p: Partial<{ from: string; to: string }>) =>
+    patch(date, r => ({
+      ...r,
+      legs: { ...r.legs, [n]: { from: r.legs[n]?.from ?? '', to: r.legs[n]?.to ?? '', ...p } },
+    }));
+
+  // copy one From / To onto every trip of the day that has a weight
+  const applyToAll = (date: string) =>
+    patch(date, r => {
+      const legs = { ...r.legs };
+      TRIP_NUMS.filter(n => num(r.weights[n]) > 0).forEach(n => {
+        legs[n] = { from: defFrom || legs[n]?.from || '', to: defTo || legs[n]?.to || '' };
+      });
+      return { ...r, legs };
+    });
+
+  const cleanLegs = (r: Row) => {
+    const out: Record<string, { from: string; to: string }> = {};
+    TRIP_NUMS.forEach(n => {
+      const l = r.legs[n];
+      if (num(r.weights[n]) && l && (l.from.trim() || l.to.trim())) {
+        out[String(n)] = { from: l.from.trim(), to: l.to.trim() };
+      }
+    });
+    return out;
+  };
+
   // --- save ----------------------------------------------------------------------------
   const saveAll = async () => {
     if (!vehicleId) return;
@@ -144,6 +182,7 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
         notes: buildNotes(d.weights, r.sources, r.notes),
         departure_point: fromOf(r, date) || null,
         destination: toOf(r, date) || null,
+        trip_legs: cleanLegs(r),
       };
       TRIP_NUMS.forEach(n => { payload[`trip_${n}`] = d.weights[n] || 0; });
 
@@ -175,19 +214,37 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
 
   const truck = vehicles.find(v => v.id === vehicleId)?.plate_number;
 
-  // From / To default to what the material sources used that day imply (e.g. M -> MCL MINES to CRUSHER).
-  // Typing in the box overrides it.
-  const derive = (r: Row, date: string, field: 'name' | 'destination') => {
-    const out: string[] = [];
-    for (const n of TRIP_NUMS) {
-      if (!num(r.weights[n])) continue;
-      const v = rateFor(rates, r.sources[n] || 'M', date)?.[field];
-      if (v && !out.includes(v)) out.push(v);
-    }
-    return out.join(' / ');
+  // Each trip's From/To = what you typed for that trip, otherwise the route of its material source
+  // (e.g. M -> MCL MINES to CRUSHER).
+  const legFrom = (r: Row, date: string, n: number) =>
+    r.legs[n]?.from || rateFor(rates, r.sources[n] || 'M', date)?.name || '';
+  const legTo = (r: Row, date: string, n: number) =>
+    r.legs[n]?.to || rateFor(rates, r.sources[n] || 'M', date)?.destination || '';
+
+  const usedTrips = (r: Row) => TRIP_NUMS.filter(n => num(r.weights[n]) > 0);
+  const joinUnique = (xs: string[]) => Array.from(new Set(xs.filter(Boolean))).join(' / ');
+  const fromOf = (r: Row, date: string) => joinUnique(usedTrips(r).map(n => legFrom(r, date, n)));
+  const toOf = (r: Row, date: string) => joinUnique(usedTrips(r).map(n => legTo(r, date, n)));
+
+  // "A → B ×4, C → D" for the grid
+  const routeSummary = (r: Row, date: string) => {
+    const counts = new Map<string, number>();
+    usedTrips(r).forEach(n => {
+      const key = `${legFrom(r, date, n) || '?'} → ${legTo(r, date, n) || '?'}`;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([k, c]) => (c > 1 ? `${k} ×${c}` : k)).join(', ');
   };
-  const fromOf = (r: Row, date: string) => r.from || derive(r, date, 'name');
-  const toOf = (r: Row, date: string) => r.to || derive(r, date, 'destination');
+
+  // places used before, offered as suggestions while typing
+  const placeSuggestions = useMemo(() => {
+    const set = new Set<string>();
+    rates.forEach(r => { if (r.name) set.add(r.name); if (r.destination) set.add(r.destination); });
+    Object.values(rows).forEach(r => Object.values(r.legs).forEach(l => { if (l.from) set.add(l.from); if (l.to) set.add(l.to); }));
+    return Array.from(set).sort();
+  }, [rates, rows]);
+
+  const routeRow = routeDay ? (rows[routeDay] ?? emptyRow()) : null;
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -258,8 +315,7 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
                 <tr>
                   <th className="sticky left-0 bg-white z-10">Date</th>
                   <th>Driver</th>
-                  <th>From</th>
-                  <th>To (destination)</th>
+                  <th>Routes (From → To)</th>
                   {TRIP_NUMS.map(n => <th key={n} className="text-center">Trip {n}<div className="font-normal text-[9px] text-slate-400">KG · source</div></th>)}
                   <th className="text-right">Trips</th>
                   <th className="text-right">Tons</th>
@@ -284,12 +340,16 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
                         </select>
                       </td>
                       <td>
-                        <input className="w-32 border border-slate-300 rounded px-1 py-1 text-[11px]" placeholder="From"
-                          value={fromOf(r, date)} onChange={e => patch(date, x => ({ ...x, from: e.target.value }))} />
-                      </td>
-                      <td>
-                        <input className="w-28 border border-slate-300 rounded px-1 py-1 text-[11px]" placeholder="To"
-                          value={toOf(r, date)} onChange={e => patch(date, x => ({ ...x, to: e.target.value }))} />
+                        {t.trips ? (
+                          <button
+                            type="button"
+                            onClick={() => setRouteDay(date)}
+                            title={routeSummary(r, date)}
+                            className="block w-60 truncate text-left border border-slate-300 rounded px-2 py-1 text-[11px] bg-white hover:bg-blue-50"
+                          >
+                            {routeSummary(r, date) || 'Set routes'}
+                          </button>
+                        ) : <span className="text-slate-300">—</span>}
                       </td>
                       {TRIP_NUMS.map(n => (
                         <td key={n} className="px-1">
@@ -323,7 +383,7 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
               <tfoot>
                 <tr className="font-bold bg-slate-50">
                   <td className="sticky left-0 bg-slate-50">{truck} total</td>
-                  <td colSpan={TRIP_NUMS.length + 3} />
+                  <td colSpan={TRIP_NUMS.length + 2} />
                   <td className="text-right text-blue-700">{summary.trips}</td>
                   <td className="text-right text-emerald-700">{fmt(summary.tons, 2)}</td>
                   <td className="text-right">{fmt(summary.revenue)}</td>
@@ -338,6 +398,74 @@ export function MclTrips({ portalColor }: { portalColor: string }) {
           </p>
         </>
       )}
+
+      <Modal
+        open={!!routeDay}
+        onClose={() => setRouteDay(null)}
+        title={routeDay ? `Routes · ${truck} · ${shortDay(routeDay)}` : 'Routes'}
+        size="xl"
+      >
+        {routeDay && routeRow && (
+          <div className="space-y-4">
+            <datalist id="mcl-places">
+              {placeSuggestions.map(p => <option key={p} value={p} />)}
+            </datalist>
+
+            <p className="text-xs text-slate-500">
+              Each trip can have its own From and To. Grey text is the default for that trip's material source;
+              type to override. Remember to press Save on the main page afterwards.
+            </p>
+
+            <div className="flex flex-wrap items-end gap-2 bg-blue-50 border border-blue-100 rounded-xl p-3">
+              <div className="flex-1 min-w-[140px]">
+                <label className="text-[11px] font-bold text-slate-700">From</label>
+                <input list="mcl-places" className="input text-xs py-1" value={defFrom} onChange={e => setDefFrom(e.target.value)} />
+              </div>
+              <div className="flex-1 min-w-[140px]">
+                <label className="text-[11px] font-bold text-slate-700">To</label>
+                <input list="mcl-places" className="input text-xs py-1" value={defTo} onChange={e => setDefTo(e.target.value)} />
+              </div>
+              <button type="button" className="btn-secondary text-xs" onClick={() => applyToAll(routeDay)}>
+                Apply to all trips
+              </button>
+            </div>
+
+            <div className="space-y-1.5 max-h-[50vh] overflow-y-auto">
+              <div className="grid grid-cols-[44px_70px_50px_1fr_1fr] gap-2 text-[10px] font-semibold uppercase text-slate-500 px-1">
+                <span>Trip</span><span>KG</span><span>Src</span><span>From</span><span>To</span>
+              </div>
+              {usedTrips(routeRow).map(n => (
+                <div key={n} className="grid grid-cols-[44px_70px_50px_1fr_1fr] gap-2 items-center">
+                  <span className="text-[11px] font-bold text-slate-700 px-1">#{n}</span>
+                  <span className="text-[11px] text-slate-600">{routeRow.weights[n]}</span>
+                  <span className="text-[11px] text-slate-600">{routeRow.sources[n] || 'M'}</span>
+                  <input
+                    list="mcl-places"
+                    className="input text-xs py-1"
+                    placeholder={rateFor(rates, routeRow.sources[n] || 'M', routeDay)?.name || 'From'}
+                    value={routeRow.legs[n]?.from || ''}
+                    onChange={e => setLeg(routeDay, n, { from: e.target.value })}
+                  />
+                  <input
+                    list="mcl-places"
+                    className="input text-xs py-1"
+                    placeholder={rateFor(rates, routeRow.sources[n] || 'M', routeDay)?.destination || 'To'}
+                    value={routeRow.legs[n]?.to || ''}
+                    onChange={e => setLeg(routeDay, n, { to: e.target.value })}
+                  />
+                </div>
+              ))}
+              {usedTrips(routeRow).length === 0 && (
+                <p className="text-xs text-slate-400 py-4 text-center">Enter the trip weights first.</p>
+              )}
+            </div>
+
+            <div className="flex justify-end border-t pt-3">
+              <button className="btn-primary" style={{ background: portalColor }} onClick={() => setRouteDay(null)}>Done</button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <MclImportModal open={importOpen} onClose={() => setImportOpen(false)} kind="trips" lookup={{ vehicles, drivers, rates }} onDone={loadMonth} />
       <RatesModal open={ratesOpen} onClose={() => setRatesOpen(false)} rates={rates} onChanged={loadLookups} />
