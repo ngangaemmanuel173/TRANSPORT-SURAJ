@@ -1,7 +1,7 @@
 import { useTruckDriverFilter, TruckDriverBar } from '@/components/TruckDriverFilter';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Package, Plus, Edit, Trash2, AlertTriangle, Clock, Truck, Upload } from 'lucide-react';
-import { supabase, getSubAccountFilter } from '@/lib/supabase';
+import { supabase, getSubAccountFilter, activeSubAccount } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { PageHeader } from '@/components/PageHeader';
 import { Modal } from '@/components/Modal';
@@ -51,7 +51,7 @@ function daysUntil(dateStr: string): number {
 export function ContainersPage({ mclArea, portalColor, isMaster = false }: { mclArea: MCLArea | null; portalColor: string; isMaster?: boolean }) {
   const { showToast } = useToast();
   const { profile } = useAuth();
-  const subAccount = (profile?.sub_account ?? getSubAccountFilter() ?? 'master') as SubAccount;
+  const subAccount = activeSubAccount(profile?.sub_account, 'master') as SubAccount;
   const derivedIsMaster = isMaster || subAccount === 'master';
   const isMCL = subAccount === 'mcl';
 
