@@ -100,7 +100,7 @@ export function WorkspaceShell({
   const getTableForActiveTab = (): { tableName: string; templateKey: string } => {
     if (activeTab === 'vehicles') return { tableName: 'vehicles', templateKey: 'vehicles' };
     if (activeTab === 'spare-parts') return { tableName: 'spare_parts_v2', templateKey: 'spare_parts' };
-    if (activeTab === 'tyres') return { tableName: 'tyres', templateKey: 'tyres' };
+    if (activeTab === 'tyres') return { tableName: 'tyres_v2', templateKey: 'tyres' };
     return { tableName: TRIPS_TABLE_BY_PORTAL[portal.slug] ?? 'sub_account_trips', templateKey: 'trips' };
   };
 
