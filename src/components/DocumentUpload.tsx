@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Paperclip, Trash2, ExternalLink, Loader2, Upload } from 'lucide-react';
-import { uploadDocument, deleteDocument, getFileName } from '@/lib/upload';
+import { uploadDocument, deleteDocument, getDocumentLink, getFileName } from '@/lib/upload';
 import { useAuth } from '@/lib/auth';
 
 interface Props {
@@ -74,6 +74,25 @@ export function DocumentUpload({
     if (fileRef.current) fileRef.current.value = '';
   };
 
+  // The bucket is private: ask for a short-lived signed link, then open it.
+  // The tab is opened first (inside the click) so the browser's pop-up blocker allows it.
+  const openDocument = async (value: string) => {
+    setError(null);
+    const tab = window.open('', '_blank');
+    const { url, error: linkError } = await getDocumentLink(value);
+    if (linkError || !url) {
+      tab?.close();
+      setError(linkError || 'Could not open this document.');
+      return;
+    }
+    if (tab) {
+      tab.opener = null;
+      tab.location.href = url;
+    } else {
+      window.location.href = url;
+    }
+  };
+
   const handleDelete = async (url: string) => {
     if (!window.confirm('Remove this document?')) return;
     const { error: deleteError } = await deleteDocument(url);
@@ -99,15 +118,14 @@ export function DocumentUpload({
               className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2"
             >
               <Paperclip className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-blue-600 hover:underline flex-1 truncate flex items-center gap-1"
+              <button
+                type="button"
+                onClick={() => openDocument(url)}
+                className="text-xs text-blue-600 hover:underline flex-1 truncate flex items-center gap-1 text-left"
               >
                 {getFileName(url)}
                 <ExternalLink className="h-3 w-3 flex-shrink-0" />
-              </a>
+              </button>
               {canDelete && !readOnly && (
                 <button
                   type="button"
