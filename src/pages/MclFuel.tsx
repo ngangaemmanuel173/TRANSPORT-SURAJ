@@ -1,18 +1,16 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Fuel as FuelIcon, Save, Settings2, Trash2, Plus } from 'lucide-react';
+import { Fuel as FuelIcon, Save, Settings2, Trash2, Plus, Download, Upload } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { PageHeader } from '@/components/PageHeader';
 import { Modal } from '@/components/Modal';
 import { LoadingSpinner } from '@/components/Shared';
+import { MclImportModal, downloadMclTemplate } from '@/components/MclImportModal';
+import { syncFuelMirror } from '@/lib/mclFuelSync';
 import { useToast } from '@/components/Toast';
 import {
   TRIP_NUMS, McRate, McFuelPrice, FuelOverride, SOURCE_CODES, rateFor, parseSources, dayTotals, daysOfMonth, monthStart, currentMonth,
   shortDay, computeFuelMonth, fmt, FuelDayInput,
 } from '@/lib/mclGrid';
-
-// Rows written to the general fuel table by this page carry this note, so they can be replaced cleanly
-// and Cost Reports / Master Reports keep seeing MCL fuel.
-const MIRROR_NOTE = 'MCL daily fuel sheet';
 
 type Row = { id?: string; f1: string; f2: string; f3: string; bal: string; dirty: boolean };
 const emptyRow = (): Row => ({ f1: '', f2: '', f3: '', bal: '', dirty: false });
@@ -33,6 +31,7 @@ export function MclFuel({ portalColor }: { portalColor: string }) {
   const [openingDirty, setOpeningDirty] = useState(false);
   const [pricesOpen, setPricesOpen] = useState(false);
   const [allocOpen, setAllocOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [override, setOverride] = useState<FuelOverride>({});
 
   const days = useMemo(() => daysOfMonth(month), [month]);
@@ -166,28 +165,7 @@ export function MclFuel({ portalColor }: { portalColor: string }) {
       }
 
       // 3. keep the general fuel table (used by Cost Reports / Master Reports) in step for this truck + month
-      const del = await supabase.from('sub_account_fuel').delete()
-        .eq('vehicle_id', vehicleId).eq('notes', MIRROR_NOTE)
-        .gte('refuel_date', monthStart(month)).lte('refuel_date', days[days.length - 1]);
-      if (del.error) throw del.error;
-
-      const mirror = computed.rows
-        .filter(r => r.added > 0)
-        .map(r => ({
-          sub_account: 'mcl',
-          vehicle_id: vehicleId,
-          refuel_date: r.date,
-          expected_litres: r.plannedLitres,
-          actual_litres: r.actualUsage ?? r.added,
-          cost_per_litre: r.price,
-          total_cost: Number(r.fueledCost.toFixed(2)),
-          trips_since_refuel: r.trips,
-          notes: MIRROR_NOTE,
-        }));
-      if (mirror.length) {
-        const ins = await supabase.from('sub_account_fuel').insert(mirror);
-        if (ins.error) throw ins.error;
-      }
+      await syncFuelMirror(vehicleId, month);
 
       showToast('Fuel sheet saved', 'success');
       await loadMonth();
@@ -231,6 +209,12 @@ export function MclFuel({ portalColor }: { portalColor: string }) {
           />
         </div>
         <div className="flex-1" />
+        <button onClick={() => downloadMclTemplate('fuel', { vehicles, drivers: [], rates })} className="btn-secondary flex items-center gap-2">
+          <Download className="h-4 w-4" /> Download Template
+        </button>
+        <button onClick={() => setImportOpen(true)} className="btn-secondary flex items-center gap-2">
+          <Upload className="h-4 w-4" /> Bulk Import
+        </button>
         <button onClick={() => setAllocOpen(true)} disabled={!vehicleId} className="btn-secondary flex items-center gap-2 disabled:opacity-50">
           <Settings2 className="h-4 w-4" /> Truck fuel allocation
         </button>
@@ -335,6 +319,7 @@ export function MclFuel({ portalColor }: { portalColor: string }) {
         </>
       )}
 
+      <MclImportModal open={importOpen} onClose={() => setImportOpen(false)} kind="fuel" lookup={{ vehicles, drivers: [], rates }} onDone={loadMonth} />
       <AllocModal
         open={allocOpen} onClose={() => setAllocOpen(false)} vehicleId={vehicleId}
         truck={vehicles.find(v => v.id === vehicleId)?.plate_number} rates={rates} override={override}
