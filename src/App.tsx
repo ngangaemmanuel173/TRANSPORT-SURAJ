@@ -13,6 +13,8 @@ import { DriversPage } from '@/pages/DriversPage';
 import { VehiclesPage } from '@/pages/VehiclesPage';
 
 // Sub-account pages
+import { MclTrips } from '@/pages/MclTrips';
+import { MclFuel } from '@/pages/MclFuel';
 import { SubAccountTrips } from '@/pages/SubAccountTrips';
 import { SubAccountTallies } from '@/pages/SubAccountTallies';
 import { SubAccountFuel } from '@/pages/SubAccountFuel';
