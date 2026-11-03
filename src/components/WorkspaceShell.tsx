@@ -11,7 +11,8 @@ import { UserRole } from '@/types';
 import { downloadExcelTemplate, TEMPLATE_SCHEMAS } from '@/lib/excelTemplates';
 import { downloadTemplate, templatesForTab, TEMPLATE_LABELS, TemplateName } from '@/lib/templates';
 import { UploadModal } from '@/components/UploadModal';
-import { normalizeTyreRecord } from '@/lib/tyreTemplate';
+import { normalizeTyreRecord, TyreVehicle } from '@/lib/tyreTemplate';
+import { insertTyres } from '@/lib/tyreImport';
 import { supabase } from '@/lib/supabase';
 import { resolveNamesToIds } from '@/lib/importLookups';
 
@@ -55,6 +56,8 @@ export function WorkspaceShell({
   const { showToast } = useToast();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  // Trucks of this sub-account, so a Tyres upload can link fitted tyres by plate number
+  const [tyreVehicles, setTyreVehicles] = useState<TyreVehicle[]>([]);
   const [tplOpen, setTplOpen] = useState(false);
   const [lookups, setLookups] = useState<{ vehicles: any[]; drivers: any[] }>({ vehicles: [], drivers: [] });
   const [showSwitcher, setShowSwitcher] = useState(false);
@@ -81,6 +84,12 @@ export function WorkspaceShell({
       window.history.replaceState({ tab }, '', newPath);
     }
   };
+
+  useEffect(() => {
+    if (activeTab !== 'tyres' || portal.slug === 'master') return;
+    supabase.from('vehicles').select('id, plate_number').eq('sub_account', portal.slug)
+      .then(({ data }) => setTyreVehicles((data as TyreVehicle[]) || []));
+  }, [activeTab, portal.slug]);
 
   useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
@@ -316,11 +325,12 @@ export function WorkspaceShell({
         subAccount={portal.slug}
         transformRow={
           activeTab === 'tyres'
-            ? (row) => normalizeTyreRecord(row, { subAccount: portal.slug })
+            ? (row) => normalizeTyreRecord(row, { subAccount: portal.slug, vehicles: tyreVehicles })
             : activeTab === 'trips' && portal.slug !== 'mcl'
             ? (row) => resolveNamesToIds(row, lookups.vehicles, lookups.drivers)
             : undefined
         }
+        insertRecords={activeTab === 'tyres' ? (records) => insertTyres(records, profile?.full_name || profile?.email || 'Import') : undefined}
         onSuccess={() => {
           showToast('Data imported successfully!', 'success');
           setRefreshKey(k => k + 1);
