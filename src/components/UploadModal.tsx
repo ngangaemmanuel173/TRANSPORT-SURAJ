@@ -9,10 +9,12 @@ interface UploadModalProps {
   onClose: () => void;
   tableName: string;
   subAccount: string;
+  /** Optional per-row clean-up (e.g. Tyres). May throw an Error describing a bad row, which cancels the upload. */
+  transformRow?: (row: Record<string, any>) => Record<string, any>;
   onSuccess?: () => void;
 }
 
-export function UploadModal({ isOpen, onClose, tableName, subAccount, onSuccess }: UploadModalProps) {
+export function UploadModal({ isOpen, onClose, tableName, subAccount, transformRow, onSuccess }: UploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const { showToast } = useToast();
@@ -45,13 +47,23 @@ export function UploadModal({ isOpen, onClose, tableName, subAccount, onSuccess 
           }
 
           const DEDICATED_TRIP_TABLES = ['mcl_trips', 'csl_trips', 'tarmal_trips', 'pn_mashru_trips'];
-          const preparedRows = DEDICATED_TRIP_TABLES.includes(tableName)
-            ? rawRows
-            : rawRows.map((row: any) => ({
-                ...row,
-                sub_account: subAccount,
-                created_at: new Date().toISOString()
-              }));
+          let preparedRows: any[];
+          if (transformRow) {
+            try {
+              preparedRows = rawRows.map((row: any) => transformRow(row));
+            } catch (err: any) {
+              showToast(`Nothing imported. ${err?.message || 'A row could not be read.'}`, 'error');
+              return;
+            }
+          } else {
+            preparedRows = DEDICATED_TRIP_TABLES.includes(tableName)
+              ? rawRows
+              : rawRows.map((row: any) => ({
+                  ...row,
+                  sub_account: subAccount,
+                  created_at: new Date().toISOString()
+                }));
+          }
 
           const { error } = await supabase.from(tableName).insert(preparedRows);
           if (error) throw error;
