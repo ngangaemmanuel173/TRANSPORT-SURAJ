@@ -9,6 +9,8 @@ import { LoadingSpinner, EmptyState } from '@/components/Shared';
 import { useToast } from '@/components/Toast';
 import { SubAccount, MCLArea } from '@/lib/portals';
 import { BulkImportModal } from '@/components/BulkImportModal';
+import { CSL_TRIP_COLUMNS, LONG_TRIP_COLUMNS } from '@/lib/importColumns';
+import { resolveNamesToIds } from '@/lib/importLookups';
 
 // Material source abbreviations used in MCL
 const SOURCES: Record<string, string> = {
@@ -562,11 +564,12 @@ export function SubAccountTrips({ mclArea, portalColor }: { mclArea: MCLArea | n
         subAccount={subAccount}
         sampleColumns={
           isCSL
-            ? ['trip_date', 'departure_point', 'destination', 'product', 'delivery_no', 'net_tallage']
+            ? CSL_TRIP_COLUMNS
             : isLongDistance
-            ? ['trip_date', 'departure_point', 'destination', 'item', 'delivery_no', 'invoice_no', 'date_loaded', 'date_delivered']
+            ? LONG_TRIP_COLUMNS
             : ['trip_date', 'departure_point', 'trip_1', 'trip_2', 'trip_3', 'net_tallage']
         }
+        transformRecord={rec => resolveNamesToIds(rec, vehicles, drivers)}
         onSuccess={loadData}
       />
     </div>
