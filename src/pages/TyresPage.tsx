@@ -8,12 +8,14 @@ import { LoadingSpinner, EmptyState } from '@/components/Shared';
 import { useToast } from '@/components/Toast';
 import { SubAccount, MCLArea } from '@/lib/portals';
 import { BulkImportModal } from '@/components/BulkImportModal';
+import { TYRE_TEMPLATE_COLUMNS, TYRE_TEMPLATE_EXAMPLE, normalizeTyreRecord } from '@/lib/tyreTemplate';
 
 /* ------------------------------------------------------------------ */
 /* Constants + helpers                                                 */
 /* ------------------------------------------------------------------ */
 
-const SAMPLE_COLUMNS = ['date_in', 'supplier', 'invoice_number', 'brand', 'serial_number', 'size', 'tyre_type', 'status', 'purchase_date', 'unit_cost', 'notes'];
+// Same columns as the Add tyre form (see src/lib/tyreTemplate.ts)
+const SAMPLE_COLUMNS = TYRE_TEMPLATE_COLUMNS;
 
 const SUB_ACCOUNTS = [
   { value: 'mcl', label: 'MCL' },
@@ -440,8 +442,11 @@ function TyresSubAccountView({ mclArea, portalColor, forceSubAccount }: { mclAre
 
   /* --------------------------- Template --------------------------- */
 
+  // Example row for the downloaded template; sub_account is the sub-account being viewed
+  const sampleRow = SAMPLE_COLUMNS.map(c => (c === 'sub_account' ? (subAccount as string) : String(TYRE_TEMPLATE_EXAMPLE[c] ?? '')));
+
   const downloadTemplate = () => {
-    const example = ['2026-09-10', 'AEXCEL', '110021168', 'TRIANGLE', 'RC11282S606', '315/80', 'new', 'in_store', '2026-09-10', '42000', ''].join(',');
+    const example = sampleRow.join(',');
     const blob = new Blob([`${SAMPLE_COLUMNS.join(',')}\n${example}\n`], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -995,6 +1000,8 @@ function TyresSubAccountView({ mclArea, portalColor, forceSubAccount }: { mclAre
         portalColor={portalColor}
         subAccount={subAccount}
         sampleColumns={SAMPLE_COLUMNS}
+        sampleRow={sampleRow}
+        transformRecord={rec => normalizeTyreRecord(rec, { subAccount, canChooseSubAccount: canSwitchSubAccount })}
         onSuccess={loadData}
       />
     </div>
