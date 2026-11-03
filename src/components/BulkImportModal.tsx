@@ -171,6 +171,7 @@ export function BulkImportModal({
         const { error } = await supabase.from(tableName).insert([finalRecord]);
         if (error) {
           console.error('Row insert error:', error.message);
+          if (!firstError) firstError = `Row ${i + 1}: ${error.message}`;
           errorCount++;
         } else {
           successCount++;
