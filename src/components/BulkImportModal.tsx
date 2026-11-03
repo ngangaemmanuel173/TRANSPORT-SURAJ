@@ -123,6 +123,7 @@ export function BulkImportModal({
       const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^["']|["']$/g, ''));
       let successCount = 0;
       let errorCount = 0;
+      let firstError = '';
 
       for (let i = 1; i < lines.length; i++) {
         const values = lines[i].split(delimiter).map(v => v.trim().replace(/^["']|["']$/g, ''));
@@ -156,7 +157,15 @@ export function BulkImportModal({
         // Skip row if no actual values were assigned beyond sub_account
         if (Object.keys(record).length <= baseKeys) continue;
 
-        const finalRecord = transformRecord ? transformRecord(record) : record;
+        let finalRecord: Record<string, any> | null = record;
+        try {
+          finalRecord = transformRecord ? transformRecord(record) : record;
+        } catch (err: any) {
+          // transformRecord can throw an Error that says what is wrong with the row
+          if (!firstError) firstError = `Row ${i + 1}: ${err?.message || 'invalid row'}`;
+          errorCount++;
+          continue;
+        }
         if (!finalRecord) { errorCount++; continue; }
 
         const { error } = await supabase.from(tableName).insert([finalRecord]);
@@ -169,11 +178,11 @@ export function BulkImportModal({
       }
 
       if (successCount > 0) {
-        showToast(`Successfully imported ${successCount} record(s)${errorCount > 0 ? `, ${errorCount} failed` : ''}`, 'success');
+        showToast(`Successfully imported ${successCount} record(s)${errorCount > 0 ? `, ${errorCount} failed${firstError ? ` (${firstError})` : ''}` : ''}`, 'success');
         onSuccess();
         onClose();
       } else {
-        showToast('Import failed. Check your file formatting and columns.', 'error');
+        showToast(firstError ? `Import failed. ${firstError}` : 'Import failed. Check your file formatting and columns.', 'error');
       }
     } catch (err: any) {
       showToast('Error processing file: ' + err.message, 'error');
