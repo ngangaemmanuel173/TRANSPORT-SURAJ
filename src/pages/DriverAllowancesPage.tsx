@@ -1,10 +1,13 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Wallet, Plus, Trash2, X, ChevronLeft, ChevronRight, Download, Zap, Pencil } from 'lucide-react';
+import { Wallet, Plus, Trash2, X, ChevronLeft, ChevronRight, Download, Zap, Pencil, Upload } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { LoadingSpinner, EmptyState } from '@/components/Shared';
 import { useToast } from '@/components/Toast';
 import { SubAccount } from '@/lib/portals';
+import { BulkImportModal } from '@/components/BulkImportModal';
+import { ALLOWANCE_COLUMNS } from '@/lib/importColumns';
+import { resolveNamesToIds } from '@/lib/importLookups';
 
 const inputCls = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-500';
 const labelCls = 'block text-xs font-semibold text-slate-600 mb-1';
@@ -55,6 +58,7 @@ export function DriverAllowancesPage({ portalColor, subAccount }: { portalColor:
   const [form, setForm] = useState(emptyForm(todayStr()));
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [isBulkOpen, setIsBulkOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -211,6 +215,9 @@ export function DriverAllowancesPage({ portalColor, subAccount }: { portalColor:
           <button onClick={exportCsv} disabled={visible.length === 0} className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
             <Download className="h-4 w-4" /> Export week
           </button>
+          <button onClick={() => setIsBulkOpen(true)} className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            <Upload className="h-4 w-4" /> Bulk Import
+          </button>
           <button onClick={() => openAdd()} className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white" style={{ background: portalColor }}>
             <Plus className="h-4 w-4" /> Add Allowance
           </button>
@@ -339,6 +346,25 @@ export function DriverAllowancesPage({ portalColor, subAccount }: { portalColor:
           </div>
         </div>
       )}
+
+      <BulkImportModal
+        open={isBulkOpen}
+        onClose={() => setIsBulkOpen(false)}
+        tableName="driver_allowances"
+        portalColor={portalColor}
+        subAccount={subAccount}
+        sampleColumns={ALLOWANCE_COLUMNS}
+        transformRecord={rec => {
+          const r = resolveNamesToIds(rec, vehicles, drivers);
+          // Same checks as the Add Allowance form
+          if (!r.driver_id) throw new Error('Driver is required');
+          if (!r.allowance_date) throw new Error('Date is required');
+          if (!(Number(r.amount) > 0)) throw new Error('Allowance amount is required');
+          r.entered_by = who;
+          return r;
+        }}
+        onSuccess={load}
+      />
     </div>
   );
 }
