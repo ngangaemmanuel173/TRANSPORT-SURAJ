@@ -18,6 +18,16 @@ interface BulkImportModalProps {
   onSuccess: () => void;
 }
 
+// Excel saves dates as dd/mm/yyyy, but the database reads that as mm/dd/yyyy and swaps day and month
+// (02/11/2026 becomes 11 February). Convert day-first dates to yyyy-mm-dd before saving.
+function normalizeDateValue(header: string, value: string): string {
+  const h = header.trim().toLowerCase();
+  if (!h.includes('date') && h !== 'eta') return value;
+  const m = value.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/);
+  if (!m) return value;
+  return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+}
+
 export function BulkImportModal({
   open,
   onClose,
@@ -147,7 +157,7 @@ export function BulkImportModal({
           } else {
             // Handle text or category codes
             if (rawVal !== undefined && rawVal !== '') {
-              record[header] = rawVal;
+              record[header] = normalizeDateValue(header, rawVal);
             } else {
               record[header] = null;
             }
