@@ -569,7 +569,16 @@ export function SubAccountTrips({ mclArea, portalColor }: { mclArea: MCLArea | n
             ? LONG_TRIP_COLUMNS
             : ['trip_date', 'departure_point', 'trip_1', 'trip_2', 'trip_3', 'net_tallage']
         }
-        transformRecord={rec => resolveNamesToIds(rec, vehicles, drivers)}
+        transformRecord={rec => {
+          const r = resolveNamesToIds(rec, vehicles, drivers);
+          if (isCSL) {
+            // Same values the Add Trip form saves for blank fields
+            for (const k of ['product', 'delivery_no', 'departure_point', 'destination']) if (r[k] == null) r[k] = '';
+            r.net_tallage = Number(r.net_tallage) || 0;
+            r.status = r.status || 'completed';
+          }
+          return r;
+        }}
         onSuccess={loadData}
       />
     </div>
