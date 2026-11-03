@@ -9,6 +9,8 @@ import { LoadingSpinner, EmptyState } from '@/components/Shared';
 import { useToast } from '@/components/Toast';
 import { SubAccount, MCLArea } from '@/lib/portals';
 import { BulkImportModal } from '@/components/BulkImportModal';
+import { TALLY_COLUMNS } from '@/lib/importColumns';
+import { resolveNamesToIds } from '@/lib/importLookups';
 
 interface SubTally {
   id: string;
@@ -263,7 +265,8 @@ export function SubAccountTallies({ mclArea, portalColor }: { mclArea: MCLArea |
         tableName="sub_account_tallies"
         portalColor={portalColor}
         subAccount={subAccount}
-        sampleColumns={['tally_date', 'trailer_number', 'net_tallage', 'notes']}
+        sampleColumns={TALLY_COLUMNS}
+        transformRecord={rec => resolveNamesToIds(rec, vehicles, [])}
         onSuccess={loadData}
       />
     </div>
