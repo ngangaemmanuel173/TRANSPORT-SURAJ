@@ -11,6 +11,8 @@ import { LoadingSpinner, EmptyState } from '@/components/Shared';
 import { useToast } from '@/components/Toast';
 import { SubAccount, MCLArea } from '@/lib/portals';
 import { BulkImportModal } from '@/components/BulkImportModal';
+import { VEHICLE_COMPLIANCE_COLUMNS, DRIVER_COMPLIANCE_COLUMNS } from '@/lib/importColumns';
+import { resolveNamesToIds } from '@/lib/importLookups';
 
 type Tab = 'vehicle' | 'driver';
 
@@ -751,11 +753,8 @@ function ComplianceSubAccountView({ mclArea, portalColor, subAccountProp }: { mc
         tableName={activeTab === 'vehicle' ? 'vehicle_compliance_items' : 'driver_compliance_items'}
         portalColor={portalColor}
         subAccount={subAccount}
-        sampleColumns={
-          activeTab === 'vehicle'
-            ? ['vehicle_id', 'compliance_type', 'cert_number', 'issuer', 'issue_date', 'expiry_date', 'alert_days', 'renewal_cost', 'status', 'notes']
-            : ['driver_id', 'compliance_type', 'document_number', 'issue_date', 'expiry_date', 'alert_days', 'status', 'notes']
-        }
+        sampleColumns={activeTab === 'vehicle' ? VEHICLE_COMPLIANCE_COLUMNS : DRIVER_COMPLIANCE_COLUMNS}
+        transformRecord={rec => resolveNamesToIds(rec, vehicles, drivers)}
         onSuccess={loadData}
       />
     </div>
