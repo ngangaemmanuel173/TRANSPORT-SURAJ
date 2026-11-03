@@ -11,10 +11,12 @@ interface UploadModalProps {
   subAccount: string;
   /** Optional per-row clean-up (e.g. Tyres). May throw an Error describing a bad row, which cancels the upload. */
   transformRow?: (row: Record<string, any>) => Record<string, any>;
+  /** Optional custom insert for the cleaned rows (e.g. Tyres: skips existing serials, writes history). Replaces the plain insert. */
+  insertRecords?: (records: Record<string, any>[]) => Promise<{ inserted: number; skipped: number; failed: number; firstError?: string }>;
   onSuccess?: () => void;
 }
 
-export function UploadModal({ isOpen, onClose, tableName, subAccount, transformRow, onSuccess }: UploadModalProps) {
+export function UploadModal({ isOpen, onClose, tableName, subAccount, transformRow, insertRecords, onSuccess }: UploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const { showToast } = useToast();
@@ -63,6 +65,19 @@ export function UploadModal({ isOpen, onClose, tableName, subAccount, transformR
                   sub_account: subAccount,
                   created_at: new Date().toISOString()
                 }));
+          }
+
+          if (insertRecords) {
+            const res = await insertRecords(preparedRows);
+            const skippedText = res.skipped > 0 ? `, ${res.skipped} skipped (already exist)` : '';
+            if (res.inserted === 0 && res.failed > 0) {
+              showToast(`Import failed. ${res.firstError || 'No record could be saved.'}`, 'error');
+              return;
+            }
+            showToast(`Successfully imported ${res.inserted} record(s)${skippedText}${res.failed > 0 ? `, ${res.failed} failed (${res.firstError})` : ''}`, 'success');
+            if (onSuccess) onSuccess();
+            onClose();
+            return;
           }
 
           const { error } = await supabase.from(tableName).insert(preparedRows);
