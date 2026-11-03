@@ -14,8 +14,13 @@
  *   Date in            date_in             date_in
  *   Date bought        purchase_date       purchase_date
  *   Unit cost (KES)    unit_cost           unit_cost
- *   Where is it now?   status              status           (in_store)
+ *   Where is it now?   status              status           (in_store | fitted | at_rebound | disposed)
  *   Notes              notes               notes
+ *
+ * Fitted tyres: the template has no truck column, so write the fitting in notes as
+ *   "Fitted on KDX 937L, diff on 04/10/2026"      (truck, optional position, date fitted)
+ * and the import links the truck by plate number and records the fitting in the tyre history.
+ * Disposed tyres can say "Removed 30/10/2026" in notes to record the date.
  */
 export const TYRE_TEMPLATE_COLUMNS = [
   'sub_account',
@@ -75,6 +80,25 @@ export function toIsoDate(v: any): string | null {
   return `${y}-${pad(m)}-${pad(d)}`;
 }
 
+export type TyreVehicle = { id: string; plate_number?: string | null };
+
+const plateKey = (v: any) => clean(v).toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+/** "KDN711K/ZC5837" or "KDX 937L" -> id of the first vehicle whose plate matches one of the parts. */
+function findVehicleId(token: string, vehicles?: TyreVehicle[]): string | null {
+  if (!token || !vehicles?.length) return null;
+  const wanted = token.split('/').map(plateKey).filter(Boolean);
+  const hit = vehicles.find(v => wanted.includes(plateKey(v.plate_number)));
+  return hit ? hit.id : null;
+}
+
+const STATUS_ALIASES: Record<string, string> = {
+  'in store': 'in_store', 'in the store': 'in_store', store: 'in_store',
+  fitted: 'fitted',
+  'at rebound': 'at_rebound', 'at rebounder': 'at_rebound', rebounding: 'at_rebound',
+  disposed: 'disposed', scrap: 'disposed', scrapped: 'disposed',
+};
+
 /**
  * Cleans one row of the Tyres template into a tyres_v2 record.
  * Throws an Error that says what is wrong with the row (the importers show the first one).
@@ -83,7 +107,7 @@ export function toIsoDate(v: any): string | null {
  */
 export function normalizeTyreRecord(
   raw: Record<string, any>,
-  ctx: { subAccount: string; canChooseSubAccount?: boolean },
+  ctx: { subAccount: string; canChooseSubAccount?: boolean; vehicles?: TyreVehicle[] },
 ): Record<string, any> {
   const serial = clean(raw.serial_number);
   if (!serial) throw new Error('serial_number is required');
@@ -101,10 +125,12 @@ export function normalizeTyreRecord(
   if (typeRaw === 'rebound' || typeRaw === 'retread') tyreType = 'rebound';
   else if (typeRaw && typeRaw !== 'new') throw new Error(`tyre_type "${clean(raw.tyre_type)}" must be new or rebound`);
 
-  // "Where is it now?" -> only the store can be imported; a fitted tyre also needs a truck and position
+  // "Where is it now?" -> status
   const statusRaw = clean(raw.status).toLowerCase().replace(/[\s_-]+/g, ' ');
-  if (statusRaw && !['in store', 'in the store', 'store'].includes(statusRaw)) {
-    throw new Error(`status "${clean(raw.status)}" is not supported in import. Use in_store, and add fitted tyres with the Add tyre form`);
+  let status = 'in_store';
+  if (statusRaw) {
+    status = STATUS_ALIASES[statusRaw];
+    if (!status) throw new Error(`status "${clean(raw.status)}" must be in_store, fitted, at_rebound or disposed`);
   }
 
   const costText = clean(raw.unit_cost).replace(/,/g, '');
@@ -119,7 +145,8 @@ export function normalizeTyreRecord(
   const dateBought = toIsoDate(raw.purchase_date);
   if (clean(raw.purchase_date) !== '' && !dateBought) throw new Error(`purchase_date "${clean(raw.purchase_date)}" is not a valid date`);
 
-  return {
+  const notes = clean(raw.notes);
+  const record: Record<string, any> = {
     sub_account: sub,
     serial_number: serial,
     tyre_type: tyreType,
@@ -130,7 +157,25 @@ export function normalizeTyreRecord(
     date_in: dateIn,
     purchase_date: dateBought,
     unit_cost: cost,
-    status: 'in_store',
-    notes: clean(raw.notes) || null,
+    status,
+    notes: notes || null,
   };
+
+  if (status === 'fitted') {
+    // "Fitted on <truck>[, <position>] on <date>" in notes -> truck, position and fitting date
+    const m = notes.match(/Fitted on (.+?)(?:, ([^;]+?))? on (\d{4}-\d{2}-\d{2}|\d{1,2}[./-]\d{1,2}[./-]\d{4})/i);
+    const fittedDate = m ? toIsoDate(m[3]) : null;
+    // the truck can only be linked for the sub-account the vehicles list belongs to
+    record.current_truck_id = m && sub === ctx.subAccount ? findVehicleId(m[1].trim(), ctx.vehicles) : null;
+    record.position = m && m[2] ? m[2].trim() : null;
+    record.fitted_date = fittedDate;
+    record.last_action = 'fitted';
+    record.last_action_date = fittedDate;
+  } else if (status === 'disposed') {
+    const m = notes.match(/Removed (\d{4}-\d{2}-\d{2}|\d{1,2}[./-]\d{1,2}[./-]\d{4})/i);
+    record.last_action = 'disposed';
+    record.last_action_date = m ? toIsoDate(m[1]) : null;
+  }
+
+  return record;
 }
