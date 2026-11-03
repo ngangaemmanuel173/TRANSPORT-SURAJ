@@ -9,6 +9,7 @@ import { Modal } from '@/components/Modal';
 import { LoadingSpinner, EmptyState } from '@/components/Shared';
 import { Driver } from '@/types';
 import { BulkImportModal } from '@/components/BulkImportModal';
+import { DRIVER_COLUMNS } from '@/lib/importColumns';
 
 const SUB_ACCOUNTS: SubAccount[] = ['mcl', 'tarmal', 'csl', 'pn_mashru'];
 
@@ -428,7 +429,7 @@ export function DriversPage({ portalColor, isMaster }: { portalColor: string; is
         tableName="drivers"
         portalColor={portalColor}
         subAccount={subAccount}
-        sampleColumns={['name', 'phone', 'id_number', 'license_number', 'nssf_number', 'sha_number', 'status']}
+        sampleColumns={DRIVER_COLUMNS}
         onSuccess={loadData}
       />
     </div>
