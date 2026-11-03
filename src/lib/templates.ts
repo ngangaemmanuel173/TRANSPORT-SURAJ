@@ -1,3 +1,5 @@
+import { TYRE_TEMPLATE_COLUMNS } from '@/lib/tyreTemplate';
+
 export type TemplateName =
   | 'trips' | 'trips_tahmal' | 'fuel' | 'tallies' | 'spare_parts' | 'spare_part_history'
   | 'containers' | 'drivers' | 'vehicles' | 'work_records' | 'staff' | 'payroll'
@@ -62,11 +64,7 @@ const HEADERS: Record<TemplateName, string[]> = {
     'Order Qty', 'Unit Price (KES)', 'Net Amount (KES)', 'Tax Amount (KES)', 'Total Amount (KES)',
     'Invoice No', 'Delivery No', 'Status',
   ],
-  tyres: [
-    'Date In', 'Supplier', 'Invoice No', 'Make', 'Serial No', 'Size', 'Type (new/rebound)', 'Status', 'Sub-Account',
-    'Truck/Trailer No', 'Position (e.g. Truck – Steer Left, Trailer – Axle 1 Left Outer)', 'Date Fitted', 'KM at Fitting',
-    'Removed Date', 'KM at Removal', 'Removal Reason', 'Cost (KES)', 'Remarks',
-  ],
+  tyres: TYRE_TEMPLATE_COLUMNS,
   vehicle_compliance: [
     'Vehicle Plate', 'Compliance Type', 'Policy/Cert No', 'Insurer/Authority', 'Issue Date',
     'Expiry Date', 'Alert Days Before', 'Renewal Cost (KES)', 'Status', 'Notes',
