@@ -12,6 +12,8 @@ import { downloadExcelTemplate, TEMPLATE_SCHEMAS } from '@/lib/excelTemplates';
 import { downloadTemplate, templatesForTab, TEMPLATE_LABELS, TemplateName } from '@/lib/templates';
 import { UploadModal } from '@/components/UploadModal';
 import { normalizeTyreRecord } from '@/lib/tyreTemplate';
+import { supabase } from '@/lib/supabase';
+import { resolveNamesToIds } from '@/lib/importLookups';
 
 type IconName = keyof typeof Icons;
 
@@ -54,6 +56,7 @@ export function WorkspaceShell({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
+  const [lookups, setLookups] = useState<{ vehicles: any[]; drivers: any[] }>({ vehicles: [], drivers: [] });
   const [showSwitcher, setShowSwitcher] = useState(false);
   // Bumping this remounts the page so it refetches. (A full page reload would sign the user out.)
   const [refreshKey, setRefreshKey] = useState(0);
@@ -106,6 +109,18 @@ export function WorkspaceShell({
   };
 
   const currentMapping = getTableForActiveTab();
+
+  // Trips files name the truck and driver; load the lists so the upload can turn them into ids.
+  useEffect(() => {
+    if (!isUploadOpen || activeTab !== 'trips') return;
+    (async () => {
+      const [v, d] = await Promise.all([
+        supabase.from('vehicles').select('id, plate_number'),
+        supabase.from('drivers').select('id, name'),
+      ]);
+      setLookups({ vehicles: v.data || [], drivers: d.data || [] });
+    })();
+  }, [isUploadOpen, activeTab]);
 
   // Template(s) for the page that is open. The importer-compatible Excel schema is used where one exists, otherwise a CSV with headers.
   const templateNames = templatesForTab(activeTab, portal.slug);
@@ -299,7 +314,13 @@ export function WorkspaceShell({
         onClose={() => setIsUploadOpen(false)}
         tableName={currentMapping.tableName}
         subAccount={portal.slug}
-        transformRow={activeTab === 'tyres' ? (row) => normalizeTyreRecord(row, { subAccount: portal.slug }) : undefined}
+        transformRow={
+          activeTab === 'tyres'
+            ? (row) => normalizeTyreRecord(row, { subAccount: portal.slug })
+            : activeTab === 'trips' && portal.slug !== 'mcl'
+            ? (row) => resolveNamesToIds(row, lookups.vehicles, lookups.drivers)
+            : undefined
+        }
         onSuccess={() => {
           showToast('Data imported successfully!', 'success');
           setRefreshKey(k => k + 1);
