@@ -23,6 +23,8 @@ interface FuelRecord {
   vehicle_id: string | null;
   trailer_number: string | null;
   driver_id: string | null;
+  departure_point: string | null;
+  destination: string | null;
   expected_litres: number | null;
   actual_litres: number | null;
   cost_per_litre: number | null;
@@ -117,6 +119,8 @@ export function SubAccountFuel({ mclArea, portalColor }: { mclArea: MCLArea | nu
     vehicle_id: '',
     trailer_number: '',
     driver_id: '',
+    departure_point: '',
+    destination: '',
     expected_litres: null as number | null,
     actual_litres: null as number | null,
     cost_per_litre: null as number | null,
@@ -217,7 +221,7 @@ export function SubAccountFuel({ mclArea, portalColor }: { mclArea: MCLArea | nu
 
   const openEdit = (r: FuelRecord) => {
     const { id, vehicle, driver, trip, created_at, sub_account, mcl_area_id, documents, ...rest } = r as any;
-    setForm({ ...rest, trip_id: rest.trip_id || '' });
+    setForm({ ...rest, trip_id: rest.trip_id || '', departure_point: rest.departure_point || '', destination: rest.destination || '' });
     setEditId(id);
     setFuelDocs(documents || []);
     setModalOpen(true);
@@ -227,6 +231,8 @@ export function SubAccountFuel({ mclArea, portalColor }: { mclArea: MCLArea | nu
     setSaving(true);
     const payload: any = { ...form };
     if (!payload.trip_id) payload.trip_id = null;
+    payload.departure_point = payload.departure_point?.trim() || null;
+    payload.destination = payload.destination?.trim() || null;
     if (isMCL && mclArea) payload.mcl_area_id = mclArea;
 
     if (editId) {
@@ -325,7 +331,7 @@ export function SubAccountFuel({ mclArea, portalColor }: { mclArea: MCLArea | nu
         <div className="card table-wrapper overflow-x-auto">
           <table className="data-table">
             <thead>
-              <tr><th>Date</th><th>Truck</th><th>Trailer</th><th>Expected (L)</th><th>Actual (L)</th><th>Variance</th><th>Cost/L</th><th>Total Cost</th><th>Trips Since Refuel</th><th>Linked Trip</th><th></th></tr>
+              <tr><th>Date</th><th>Truck</th><th>Trailer</th><th>From</th><th>Destination</th><th>Expected (L)</th><th>Actual (L)</th><th>Variance</th><th>Cost/L</th><th>Total Cost</th><th>Trips Since Refuel</th><th>Linked Trip</th><th></th></tr>
             </thead>
             <tbody>
               {filteredRecords.map(r => {
@@ -336,6 +342,8 @@ export function SubAccountFuel({ mclArea, portalColor }: { mclArea: MCLArea | nu
                     <td className="text-slate-600 whitespace-nowrap">{r.refuel_date}</td>
                     <td className="font-semibold text-slate-800">{r.vehicle?.plate_number || '—'}</td>
                     <td className="text-slate-600">{r.trailer_number || '—'}</td>
+                    <td className="text-slate-600">{r.departure_point || '—'}</td>
+                    <td className="text-slate-600">{r.destination || '—'}</td>
                     <td className="text-slate-600">{fmtNum(r.expected_litres, 1)}</td>
                     <td className="text-slate-600">{fmtNum(r.actual_litres, 1)}</td>
                     <td><span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${vc.bg} ${vc.text}`}>{varianceL != null ? `${varianceL > 0 ? '+' : ''}${fmtNum(varianceL, 1)} L` : '—'}</span></td>
@@ -358,6 +366,8 @@ export function SubAccountFuel({ mclArea, portalColor }: { mclArea: MCLArea | nu
           <div><label className="label">Truck</label><select className="input" value={form.vehicle_id} onChange={e => setForm({ ...form, vehicle_id: e.target.value })}><option value="">Select Truck</option>{vehicles.map(v => <option key={v.id} value={v.id}>{v.plate_number}</option>)}</select></div>
           <div><label className="label">Trailer Number</label><input type="text" className="input" value={form.trailer_number} onChange={e => setForm({ ...form, trailer_number: e.target.value })} /></div>
           <div><label className="label">Driver</label><select className="input" value={form.driver_id} onChange={e => setForm({ ...form, driver_id: e.target.value })}><option value="">Select Driver</option>{drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
+          <div><label className="label">From</label><input type="text" className="input" placeholder="e.g. Mombasa" value={form.departure_point} onChange={e => setForm({ ...form, departure_point: e.target.value })} /></div>
+          <div><label className="label">Destination</label><input type="text" className="input" placeholder="e.g. Nairobi" value={form.destination} onChange={e => setForm({ ...form, destination: e.target.value })} /></div>
           <div><label className="label">Expected Litres</label><input type="number" step="0.01" className="input" value={form.expected_litres ?? ''} onChange={e => setForm({ ...form, expected_litres: e.target.value ? Number(e.target.value) : null })} /></div>
           <div><label className="label">Actual Litres</label><input type="number" step="0.01" className="input" value={form.actual_litres ?? ''} onChange={e => handleActualOrCostChange(e.target.value ? Number(e.target.value) : null, form.cost_per_litre)} /></div>
           <div><label className="label">Cost per Litre (KES)</label><input type="number" step="0.01" className="input" value={form.cost_per_litre ?? ''} onChange={e => handleActualOrCostChange(form.actual_litres, e.target.value ? Number(e.target.value) : null)} /></div>
