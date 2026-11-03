@@ -72,7 +72,7 @@ export function BulkImportModal({
 
   // Columns that must stay as text (dates, ids, labels), even if the name contains "trip" or "fuel"
   const TEXT_COLUMNS = new Set([
-    'trip_date', 'fuel_date', 'sub_account', 'mcl_area_id', 'departure_point',
+    'trip_date', 'trip_ref', 'fuel_date', 'sub_account', 'mcl_area_id', 'departure_point',
     'arrival_point', 'destination_city', 'trailer_number', 'status', 'notes',
     'vehicle_id', 'driver_id', 'current_truck', 'serial_number', 'part_name', 'part_type', 'category', 'supplier',
   ]);
