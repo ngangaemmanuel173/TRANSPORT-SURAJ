@@ -16,7 +16,7 @@ export const LONG_TRIP_COLUMNS = [
 ];
 
 export const FUEL_COLUMNS = [
-  'refuel_date', 'truck_plate', 'trailer_number', 'driver_name',
+  'refuel_date', 'truck_plate', 'trailer_number', 'driver_name', 'departure_point', 'destination',
   'expected_litres', 'actual_litres', 'cost_per_litre', 'total_cost',
 ];
 
