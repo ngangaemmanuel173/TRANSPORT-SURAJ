@@ -15,6 +15,8 @@ interface BulkImportModalProps {
   sampleRow?: string[];
   /** Optional per-row clean-up before insert. Return null to skip the row. */
   transformRecord?: (record: Record<string, any>) => Record<string, any> | null;
+  /** Optional custom insert (e.g. Tyres: skips serials that already exist and writes history). Replaces the plain insert. */
+  insertRecord?: (record: Record<string, any>) => Promise<{ ok: boolean; skipped?: boolean; error?: string }>;
   onSuccess: () => void;
 }
 
@@ -28,6 +30,25 @@ function normalizeDateValue(header: string, value: string): string {
   return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
 }
 
+/** Splits one CSV/TSV line, keeping delimiters that sit inside "quotes" (e.g. a note like "Fitted on KDX 937L, diff"). */
+function splitCsvLine(line: string, delimiter: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+      else if (ch === '"') inQuotes = false;
+      else cur += ch;
+    } else if (ch === '"') inQuotes = true;
+    else if (ch === delimiter) { out.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
 export function BulkImportModal({
   open,
   onClose,
@@ -37,6 +58,7 @@ export function BulkImportModal({
   sampleColumns,
   sampleRow,
   transformRecord,
+  insertRecord,
   onSuccess,
 }: BulkImportModalProps) {
   const { showToast } = useToast();
@@ -130,13 +152,14 @@ export function BulkImportModal({
 
       // Support comma or tab separation
       const delimiter = lines[0].includes('\t') ? '\t' : ',';
-      const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^["']|["']$/g, ''));
+      const headers = splitCsvLine(lines[0], delimiter).map(h => h.trim().replace(/^["']|["']$/g, ''));
       let successCount = 0;
       let errorCount = 0;
       let firstError = '';
+      let skippedCount = 0;
 
       for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(delimiter).map(v => v.trim().replace(/^["']|["']$/g, ''));
+        const values = splitCsvLine(lines[i], delimiter).map(v => v.trim());
         // The per-sub-account trips tables (mcl_trips, csl_trips, ...) keep the data apart by being separate
         // tables and have no sub_account column, so it must not be sent for them.
         const OWN_TRIPS = ['mcl_trips', 'csl_trips', 'tarmal_trips', 'pn_mashru_trips', 'mushroom_trips'];
@@ -178,6 +201,17 @@ export function BulkImportModal({
         }
         if (!finalRecord) { errorCount++; continue; }
 
+        if (insertRecord) {
+          const res = await insertRecord(finalRecord);
+          if (res.ok) successCount++;
+          else if (res.skipped) skippedCount++;
+          else {
+            errorCount++;
+            if (!firstError) firstError = `Row ${i + 1}: ${res.error || 'could not be saved'}`;
+          }
+          continue;
+        }
+
         const { error } = await supabase.from(tableName).insert([finalRecord]);
         if (error) {
           console.error('Row insert error:', error.message);
@@ -188,8 +222,13 @@ export function BulkImportModal({
         }
       }
 
+      const skippedText = skippedCount > 0 ? `, ${skippedCount} skipped (already exist)` : '';
       if (successCount > 0) {
-        showToast(`Successfully imported ${successCount} record(s)${errorCount > 0 ? `, ${errorCount} failed${firstError ? ` (${firstError})` : ''}` : ''}`, 'success');
+        showToast(`Successfully imported ${successCount} record(s)${skippedText}${errorCount > 0 ? `, ${errorCount} failed${firstError ? ` (${firstError})` : ''}` : ''}`, 'success');
+        onSuccess();
+        onClose();
+      } else if (skippedCount > 0 && errorCount === 0) {
+        showToast(`Nothing new to import: all ${skippedCount} record(s) already exist.`, 'success');
         onSuccess();
         onClose();
       } else {
