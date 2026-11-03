@@ -1,10 +1,15 @@
 import { TYRE_TEMPLATE_COLUMNS } from '@/lib/tyreTemplate';
+import {
+  CSL_TRIP_COLUMNS, LONG_TRIP_COLUMNS, FUEL_COLUMNS, TALLY_COLUMNS, CONTAINER_COLUMNS,
+  VEHICLE_COMPLIANCE_COLUMNS, DRIVER_COMPLIANCE_COLUMNS, DRIVER_COLUMNS, VEHICLE_COLUMNS,
+} from '@/lib/importColumns';
 
 export type TemplateName =
   | 'trips' | 'trips_tahmal' | 'fuel' | 'tallies' | 'spare_parts' | 'spare_part_history'
   | 'containers' | 'drivers' | 'vehicles' | 'work_records' | 'staff' | 'payroll'
   | 'weighbridge' | 'client_deliveries' | 'tyres' | 'vehicle_compliance'
   | 'driver_compliance' | 'products' | 'rate_matrix' | 'daily_dispatch'
+  | 'trips_csl' | 'trips_long' | 'fuel_import' | 'tallies_import'
   | 'driver_allowances' | 'truck_revenue' | 'cost_entries' | 'driver_salaries' | 'users';
 
 const HEADERS: Record<TemplateName, string[]> = {
@@ -18,6 +23,10 @@ const HEADERS: Record<TemplateName, string[]> = {
     'Start Odometer', 'End Odometer', 'Distance KM', 'Fuel Expected (L)', 'Fuel Actual (L)',
     'Fuel Date', 'Trips Since Refuel', 'Fuel Cost (KES)', 'Mileage Payment (KES)', 'Labour Cost (KES)', 'Status', 'Notes',
   ],
+  trips_csl: CSL_TRIP_COLUMNS,
+  trips_long: LONG_TRIP_COLUMNS,
+  fuel_import: FUEL_COLUMNS,
+  tallies_import: TALLY_COLUMNS,
   fuel: [
     'Date', 'Truck Plate', 'Trailer No', 'Driver', 'Expected Litres', 'Actual Litres',
     'Cost per Litre (KES)', 'Total Cost (KES)', 'Trips Since Last Refuel', 'Linked Trip Date', 'Notes',
@@ -33,17 +42,9 @@ const HEADERS: Record<TemplateName, string[]> = {
   spare_part_history: [
     'Serial Number', 'Action', 'Date', 'Truck Plate', 'Duration (days)', 'Reason', 'Performed By', 'Notes',
   ],
-  containers: [
-    'Container No', 'Size', 'Shipping Line', 'Agent Name', 'Consignee', 'B/L No', 'Vessel/Voyage',
-    'ETA', 'Destination', 'Detention Validity', 'Release Date', 'Truck Plate', 'Trailer No', 'Status', 'Notes',
-  ],
-  drivers: [
-    'Name', 'Phone', 'License Number', 'License Expiry', 'Status', 'Hire Date', 'Notes',
-  ],
-  vehicles: [
-    'Plate Number', 'Make', 'Model', 'Year', 'Load Capacity (T)', 'Fuel Type',
-    'Odometer (km)', 'Last Service Date', 'Status', 'Trailer Number',
-  ],
+  containers: CONTAINER_COLUMNS,
+  drivers: DRIVER_COLUMNS,
+  vehicles: VEHICLE_COLUMNS,
   work_records: [
     'Date', 'Vehicle Plate', 'Description', 'Work Type', 'Hours Worked', 'Labour Cost (KES)',
     'Parts Cost (KES)', 'Performed By', 'Status', 'Notes',
@@ -65,14 +66,8 @@ const HEADERS: Record<TemplateName, string[]> = {
     'Invoice No', 'Delivery No', 'Status',
   ],
   tyres: TYRE_TEMPLATE_COLUMNS,
-  vehicle_compliance: [
-    'Vehicle Plate', 'Compliance Type', 'Policy/Cert No', 'Insurer/Authority', 'Issue Date',
-    'Expiry Date', 'Alert Days Before', 'Renewal Cost (KES)', 'Status', 'Notes',
-  ],
-  driver_compliance: [
-    'Driver Name', 'Compliance Type', 'Document Number', 'Issue Date', 'Expiry Date',
-    'Alert Days Before', 'Status', 'Notes',
-  ],
+  vehicle_compliance: VEHICLE_COMPLIANCE_COLUMNS,
+  driver_compliance: DRIVER_COMPLIANCE_COLUMNS,
   products: [
     'Item Code', 'Description', 'Packaging', 'Volume/Weight', 'Unit Price (KES)', 'Status',
   ],
@@ -95,7 +90,7 @@ const HEADERS: Record<TemplateName, string[]> = {
 };
 
 export const TEMPLATE_LABELS: Record<TemplateName, string> = {
-  trips: 'Trips', trips_tahmal: 'Trips (Tarmal)', fuel: 'Fuel', tallies: 'Tallies', spare_parts: 'Spare parts',
+  trips: 'Trips', trips_tahmal: 'Trips (Tarmal)', trips_csl: 'Trips', trips_long: 'Trips', fuel_import: 'Fuel', tallies_import: 'Tallies', fuel: 'Fuel', tallies: 'Tallies', spare_parts: 'Spare parts',
   spare_part_history: 'Spare part history', containers: 'Containers', drivers: 'Drivers', vehicles: 'Trucks / Vehicles',
   work_records: 'Work records', staff: 'Staff', payroll: 'Payroll', weighbridge: 'Weighbridge', client_deliveries: 'Client deliveries',
   tyres: 'Tyres', vehicle_compliance: 'Vehicle compliance', driver_compliance: 'Driver compliance', products: 'Products',
@@ -107,10 +102,10 @@ export const TEMPLATE_LABELS: Record<TemplateName, string> = {
 export function templatesForTab(tab: string, portalSlug: string): TemplateName[] {
   if (tab.startsWith('spares-')) return ['spare_parts', 'spare_part_history'];
   switch (tab) {
-    case 'trips': return [portalSlug === 'tarmal' ? 'trips_tahmal' : 'trips'];
-    case 'fuel': return ['fuel'];
+    case 'trips': return [portalSlug === 'csl' ? 'trips_csl' : (portalSlug === 'tarmal' || portalSlug === 'pn_mashru') ? 'trips_long' : 'trips'];
+    case 'fuel': return [portalSlug === 'mcl' ? 'fuel' : 'fuel_import'];
     case 'allowances': return ['driver_allowances'];
-    case 'tallies': return ['tallies'];
+    case 'tallies': return [portalSlug === 'mcl' ? 'tallies' : 'tallies_import'];
     case 'drivers': return ['drivers'];
     case 'vehicles': return ['vehicles'];
     case 'spare-parts': return ['spare_parts', 'spare_part_history'];
