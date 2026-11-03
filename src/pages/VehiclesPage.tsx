@@ -9,6 +9,7 @@ import { Modal } from '@/components/Modal';
 import { LoadingSpinner, EmptyState } from '@/components/Shared';
 import { PageHeader } from '@/components/PageHeader';
 import { BulkImportModal } from '@/components/BulkImportModal';
+import { VEHICLE_COLUMNS } from '@/lib/importColumns';
 
 interface Vehicle {
   id: string;
@@ -404,7 +405,7 @@ export function VehiclesPage({ portalColor = '#0f172a', isMaster = false }: { po
         tableName="vehicles"
         portalColor={portalColor}
         subAccount={subAccount}
-        sampleColumns={['plate_number', 'make', 'model', 'year', 'status']}
+        sampleColumns={VEHICLE_COLUMNS}
         onSuccess={loadData}
       />
     </div>
