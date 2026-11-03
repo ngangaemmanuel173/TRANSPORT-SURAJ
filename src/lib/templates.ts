@@ -1,7 +1,7 @@
 import { TYRE_TEMPLATE_COLUMNS } from '@/lib/tyreTemplate';
 import {
   CSL_TRIP_COLUMNS, LONG_TRIP_COLUMNS, FUEL_COLUMNS, TALLY_COLUMNS, CONTAINER_COLUMNS,
-  VEHICLE_COMPLIANCE_COLUMNS, DRIVER_COMPLIANCE_COLUMNS, DRIVER_COLUMNS, VEHICLE_COLUMNS,
+  VEHICLE_COMPLIANCE_COLUMNS, DRIVER_COMPLIANCE_COLUMNS, DRIVER_COLUMNS, VEHICLE_COLUMNS, ALLOWANCE_COLUMNS,
 } from '@/lib/importColumns';
 
 export type TemplateName =
@@ -77,9 +77,7 @@ const HEADERS: Record<TemplateName, string[]> = {
   daily_dispatch: [
     'Date', 'Truck Plate', 'Driver Name', 'Route', 'Cargo Type', 'Trip Status', 'Notes',
   ],
-  driver_allowances: [
-    'Date', 'Driver Name', 'Truck Plate', 'Trip Reference', 'Allowance (KES)', 'Notes',
-  ],
+  driver_allowances: ALLOWANCE_COLUMNS,
   truck_revenue: ['Month (YYYY-MM)', 'Truck Plate', 'Revenue (KES)', 'Notes'],
   cost_entries: [
     'Month (YYYY-MM)', 'Report Type (financial/employment/overhead/miscellaneous)', 'Category (insurance/loan/leasing/labour/consultancy/rent/internet/electricity/water/fines/tolls/parking/permits/accommodation/general/other)',
