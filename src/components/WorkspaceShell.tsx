@@ -11,6 +11,7 @@ import { UserRole } from '@/types';
 import { downloadExcelTemplate, TEMPLATE_SCHEMAS } from '@/lib/excelTemplates';
 import { downloadTemplate, templatesForTab, TEMPLATE_LABELS, TemplateName } from '@/lib/templates';
 import { UploadModal } from '@/components/UploadModal';
+import { normalizeTyreRecord } from '@/lib/tyreTemplate';
 
 type IconName = keyof typeof Icons;
 
@@ -298,6 +299,7 @@ export function WorkspaceShell({
         onClose={() => setIsUploadOpen(false)}
         tableName={currentMapping.tableName}
         subAccount={portal.slug}
+        transformRow={activeTab === 'tyres' ? (row) => normalizeTyreRecord(row, { subAccount: portal.slug }) : undefined}
         onSuccess={() => {
           showToast('Data imported successfully!', 'success');
           setRefreshKey(k => k + 1);
