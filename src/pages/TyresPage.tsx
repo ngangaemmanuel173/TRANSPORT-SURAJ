@@ -9,6 +9,7 @@ import { useToast } from '@/components/Toast';
 import { SubAccount, MCLArea } from '@/lib/portals';
 import { BulkImportModal } from '@/components/BulkImportModal';
 import { TYRE_TEMPLATE_COLUMNS, TYRE_TEMPLATE_EXAMPLE, normalizeTyreRecord } from '@/lib/tyreTemplate';
+import { insertTyre } from '@/lib/tyreImport';
 
 /* ------------------------------------------------------------------ */
 /* Constants + helpers                                                 */
@@ -1001,7 +1002,8 @@ function TyresSubAccountView({ mclArea, portalColor, forceSubAccount }: { mclAre
         subAccount={subAccount}
         sampleColumns={SAMPLE_COLUMNS}
         sampleRow={sampleRow}
-        transformRecord={rec => normalizeTyreRecord(rec, { subAccount, canChooseSubAccount: canSwitchSubAccount })}
+         transformRecord={rec => normalizeTyreRecord(rec, { subAccount, canChooseSubAccount: canSwitchSubAccount, vehicles })}
+        insertRecord={rec => insertTyre(rec, performedBy)}
         onSuccess={loadData}
       />
     </div>
