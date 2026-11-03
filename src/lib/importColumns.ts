@@ -37,5 +37,8 @@ export const DRIVER_COMPLIANCE_COLUMNS = [
   'alert_days', 'status', 'notes',
 ];
 
+// Driver Allowances form: Date, Allowance (KES), Driver, Truck, Trip reference, Notes
+export const ALLOWANCE_COLUMNS = ['allowance_date', 'amount', 'driver_name', 'truck_plate', 'trip_ref', 'notes'];
+
 export const DRIVER_COLUMNS = ['name', 'phone', 'id_number', 'license_number', 'nssf_number', 'sha_number', 'status'];
 export const VEHICLE_COLUMNS = ['plate_number', 'make', 'model', 'year', 'status'];
