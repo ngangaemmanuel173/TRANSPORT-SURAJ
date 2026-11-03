@@ -12,6 +12,8 @@ import { LoadingSpinner, EmptyState } from '@/components/Shared';
 import { useToast } from '@/components/Toast';
 import { SubAccount, MCLArea } from '@/lib/portals';
 import { BulkImportModal } from '@/components/BulkImportModal';
+import { FUEL_COLUMNS } from '@/lib/importColumns';
+import { resolveNamesToIds } from '@/lib/importLookups';
 
 interface FuelRecord {
   id: string;
@@ -374,7 +376,8 @@ export function SubAccountFuel({ mclArea, portalColor }: { mclArea: MCLArea | nu
         tableName="sub_account_fuel"
         portalColor={portalColor}
         subAccount={subAccount}
-        sampleColumns={['refuel_date', 'trailer_number', 'expected_litres', 'actual_litres', 'cost_per_litre', 'total_cost', 'notes']}
+        sampleColumns={FUEL_COLUMNS}
+        transformRecord={rec => resolveNamesToIds(rec, vehicles, drivers)}
         onSuccess={loadData}
       />
     </div>
