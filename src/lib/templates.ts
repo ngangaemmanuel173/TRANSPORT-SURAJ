@@ -28,7 +28,7 @@ const HEADERS: Record<TemplateName, string[]> = {
   fuel_import: FUEL_COLUMNS,
   tallies_import: TALLY_COLUMNS,
   fuel: [
-    'Date', 'Truck Plate', 'Trailer No', 'Driver', 'Expected Litres', 'Actual Litres',
+    'Date', 'Truck Plate', 'Trailer No', 'Driver', 'From', 'Destination', 'Expected Litres', 'Actual Litres',
     'Cost per Litre (KES)', 'Total Cost (KES)', 'Trips Since Last Refuel', 'Linked Trip Date', 'Notes',
   ],
   tallies: [
