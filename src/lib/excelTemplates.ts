@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { TYRE_TEMPLATE_COLUMNS, TYRE_TEMPLATE_EXAMPLE } from '@/lib/tyreTemplate';
 
 export const TEMPLATE_SCHEMAS: Record<string, { filename: string; headers: string[]; example: Record<string, any> }> = {
   spare_parts: {
@@ -53,21 +54,15 @@ export const TEMPLATE_SCHEMAS: Record<string, { filename: string; headers: strin
   },
   tyres: {
     filename: 'Tyres_Import_Template.xlsx',
-    headers: ['serial_number', 'position', 'status', 'cost', 'total_km'],
-    example: {
-      serial_number: 'TYR-99201',
-      position: 'Front Left',
-      status: 'active',
-      cost: 32000,
-      total_km: 12500
-    }
-  }
+    headers: TYRE_TEMPLATE_COLUMNS,
+    example: TYRE_TEMPLATE_EXAMPLE,
+  },
 };
 
 export function downloadExcelTemplate(type: keyof typeof TEMPLATE_SCHEMAS) {
   const schema = TEMPLATE_SCHEMAS[type] || TEMPLATE_SCHEMAS.spare_parts;
 
-  const worksheet = XLSX.utils.json_to_sheet([schema.example]);
+  const worksheet = XLSX.utils.json_to_sheet([schema.example], { header: schema.headers });
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Import Template');
   XLSX.writeFile(workbook, schema.filename);
