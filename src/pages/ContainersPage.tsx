@@ -10,6 +10,8 @@ import { LoadingSpinner, EmptyState } from '@/components/Shared';
 import { useToast } from '@/components/Toast';
 import { SubAccount, MCLArea } from '@/lib/portals';
 import { BulkImportModal } from '@/components/BulkImportModal';
+import { CONTAINER_COLUMNS } from '@/lib/importColumns';
+import { resolveNamesToIds } from '@/lib/importLookups';
 
 interface Container {
   id: string;
@@ -476,22 +478,8 @@ export function ContainersPage({ mclArea, portalColor, isMaster = false }: { mcl
         tableName="sub_account_containers"
         portalColor={portalColor}
         subAccount={subAccount}
-        sampleColumns={[
-          'container_no',
-          'size',
-          'shipping_line',
-          'agent_name',
-          'consignee',
-          'bl_no',
-          'vessel_voyage',
-          'eta',
-          'destination',
-          'detention_validity',
-          'release_date',
-          'trailer_number',
-          'status',
-          'notes',
-        ]}
+        sampleColumns={CONTAINER_COLUMNS}
+        transformRecord={rec => resolveNamesToIds(rec, vehicles, [])}
         onSuccess={loadData}
       />
     </div>
