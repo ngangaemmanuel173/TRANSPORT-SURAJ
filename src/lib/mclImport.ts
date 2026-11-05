@@ -111,7 +111,8 @@ export function validateTrips(raw: Record<string, any>[], lk: Lookup): ImportRes
     const n = normaliseRow(r);
     if (allBlank(n)) return;
 
-    const fail = (message: string) => errors.push({ line, message });
+    const ref = n.ref ? String(n.ref) : '';
+    const fail = (message: string) => errors.push({ line: Number(n.ref_row) || line, message: ref ? `[${ref}] ${message}` : message });
 
     const date = toISODate(pick(n, 'date', 'trip_date'));
     if (!date) return fail('Date is missing or not a valid date (use yyyy-mm-dd or dd/mm/yyyy)');
@@ -199,7 +200,8 @@ export function validateFuel(raw: Record<string, any>[], lk: Lookup): ImportResu
     const line = i + 2;
     const n = normaliseRow(r);
     if (allBlank(n)) return;
-    const fail = (message: string) => errors.push({ line, message });
+    const ref = n.ref ? String(n.ref) : '';
+    const fail = (message: string) => errors.push({ line: Number(n.ref_row) || line, message: ref ? `[${ref}] ${message}` : message });
 
     const date = toISODate(pick(n, 'date', 'fuel_date'));
     if (!date) return fail('Date is missing or not a valid date (use yyyy-mm-dd or dd/mm/yyyy)');
