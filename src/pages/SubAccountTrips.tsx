@@ -9,6 +9,7 @@ import { LoadingSpinner, EmptyState } from '@/components/Shared';
 import { useToast } from '@/components/Toast';
 import { SubAccount, MCLArea } from '@/lib/portals';
 import { BulkImportModal } from '@/components/BulkImportModal';
+import { planTripMerge, applyTripPlan } from '@/lib/mergeImport';
 import { CSL_TRIP_COLUMNS, LONG_TRIP_COLUMNS } from '@/lib/importColumns';
 import { resolveNamesToIds } from '@/lib/importLookups';
 
@@ -578,6 +579,13 @@ export function SubAccountTrips({ mclArea, portalColor }: { mclArea: MCLArea | n
             r.status = r.status || 'completed';
           }
           return r;
+        }}
+        // CSL: preview first. A row for a trip that is already saved only fills in what is blank there.
+        planRecord={isCSL ? (rec, earlier) => planTripMerge(tableName, rec, earlier) : undefined}
+        applyPlan={isCSL ? plan => applyTripPlan(tableName, plan) : undefined}
+        labelRecord={rec => {
+          const plate = vehicles.find(v => v.id === rec.vehicle_id)?.plate_number || 'No truck';
+          return [plate, rec.trip_date, rec.delivery_no].filter(Boolean).join(' · ');
         }}
         onSuccess={loadData}
       />
