@@ -12,6 +12,7 @@ import {
   TRIP_TEMPLATE_HEADERS, FUEL_TEMPLATE_HEADERS, tripTemplateExamples, fuelTemplateExamples,
 } from '@/lib/mclImport';
 import { syncFuelMirror } from '@/lib/mclFuelSync';
+import { isMclWorkbook, workbookToRows } from '@/lib/mclWorkbook';
 
 export type ImportKind = 'trips' | 'fuel';
 
@@ -159,8 +160,9 @@ export function MclImportModal({
   const [fileName, setFileName] = useState('');
   const [result, setResult] = useState<ImportResult<TripImportRow | FuelImportRow> | null>(null);
   const [busy, setBusy] = useState(false);
+  const [notes, setNotes] = useState<string[]>([]);
 
-  const reset = () => { setFileName(''); setResult(null); if (fileRef.current) fileRef.current.value = ''; };
+  const reset = () => { setFileName(''); setResult(null); setNotes([]); if (fileRef.current) fileRef.current.value = ''; };
   const close = () => { reset(); onClose(); };
 
   const onFile = async (file?: File) => {
@@ -169,9 +171,18 @@ export function MclImportModal({
     setResult(null);
     try {
       const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: '' });
-      if (raw.length === 0) { showToast('That file has no rows.', 'error'); return; }
+      let raw: Record<string, any>[];
+      if (isMclWorkbook(wb)) {
+        // the monthly workbook: one sheet per truck. Read every truck sheet.
+        const book = workbookToRows(wb, kind);
+        raw = book.rows;
+        setNotes([`Read ${book.sheets.length} truck sheet(s) from the monthly workbook: ${book.sheets.join(', ')}.`, ...book.warnings]);
+      } else {
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: '' });
+        setNotes([]);
+      }
+      if (raw.length === 0) { showToast('No trips or fuel rows were found in that file.', 'error'); return; }
       setResult(kind === 'trips' ? validateTrips(raw, lookup) : validateFuel(raw, lookup));
     } catch (e: any) {
       showToast('Could not read that file: ' + (e?.message || e), 'error');
@@ -226,7 +237,7 @@ export function MclImportModal({
         </div>
 
         <div className="rounded-xl border border-slate-200 p-4">
-          <p className="font-semibold text-slate-800 text-sm mb-2">2. Upload your filled file (.xlsx or .csv)</p>
+          <p className="font-semibold text-slate-800 text-sm mb-2">2. Upload your filled file (.xlsx or .csv), or your monthly workbook with one sheet per truck</p>
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => onFile(e.target.files?.[0])} />
           <button onClick={() => fileRef.current?.click()} className="btn-secondary flex items-center gap-2">
             <Upload className="h-4 w-4" /> Choose file
@@ -242,6 +253,13 @@ export function MclImportModal({
               {errs.length > 0 && <span className="flex items-center gap-1 text-red-600 font-semibold"><AlertTriangle className="h-4 w-4" /> {errs.length} row(s) with problems (will be skipped)</span>}
               {result.skipped > 0 && <span className="text-slate-500">{result.skipped} empty row(s) ignored</span>}
             </div>
+
+            {notes.length > 0 && (
+              <div className="max-h-32 overflow-y-auto rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 space-y-0.5">
+                {notes.slice(0, 30).map((m, i) => <p key={i}>{m}</p>)}
+                {notes.length > 30 && <p>…and {notes.length - 30} more</p>}
+              </div>
+            )}
 
             {errs.length > 0 && (
               <div className="max-h-40 overflow-y-auto rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-700 space-y-0.5">
